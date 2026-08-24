@@ -77,7 +77,6 @@ fix: impede reserva em horário ocupado
 
 ## Equipe
 
-Adicione aqui os nomes e as responsabilidades dos integrantes.
 
 | Integrante | Responsabilidade inicial |
 |---|---|
