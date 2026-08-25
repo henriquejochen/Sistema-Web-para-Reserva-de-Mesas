@@ -77,8 +77,8 @@ fix: impede reserva em horário ocupado
 
 ## Equipe
 
-Kauã Fernandes Ghizzo — UX/UI Front-EndLíder, Scrum Master e QA
-Henrique Jochen de Oliveira — UX/UI Front-End
-Thiago de Souza Devilla — Back-end
-Vinicius Nunes Westrup — Adm Banco de Dados (DBA)
+- Kauã Fernandes Ghizzo — UX/UI Front-EndLíder, Scrum Master e QA
+- Henrique Jochen de Oliveira — UX/UI Front-End
+- Thiago de Souza Devilla — Back-end
+- Vinicius Nunes Westrup — Adm Banco de Dados (DBA)
 
