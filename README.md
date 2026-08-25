@@ -30,11 +30,11 @@ O projeto está na fase de prototipação (Entrega 01). Nesta etapa serão defin
 ## Tecnologias propostas
 
 - Front-end: HTML, CSS, JavaScript e Bootstrap;
-- Back-end: Node.js com Express;
+- Back-end: Phyton e Django;
 - Banco de dados: PostgreSQL;
 - Prototipação: Figma;
 - Versionamento: Git e GitHub;
-- Kanban: GitHub Projects ou Trello.
+- Kanban: Jira;
 
 As tecnologias podem ser ajustadas pela equipe antes do início da implementação.
 
@@ -77,8 +77,8 @@ fix: impede reserva em horário ocupado
 
 ## Equipe
 
-
-| Integrante | Responsabilidade inicial |
-|---|---|
-| Nome | A definir |
+Kauã Fernandes Ghizzo — UX/UI Front-EndLíder, Scrum Master e QA
+Henrique Jochen de Oliveira — UX/UI Front-End
+Thiago de Souza Devilla — Back-end
+Vinicius Nunes Westrup — Adm Banco de Dados (DBA)
 

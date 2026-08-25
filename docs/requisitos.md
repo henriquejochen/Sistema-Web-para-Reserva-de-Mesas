@@ -3,6 +3,7 @@
 ## Problema
 
 Reservas feitas apenas por telefone ou mensagem podem gerar demora, perda de informações e conflitos de horário.
+Cliente diz que atualmente as reservas são feitas todas por Whatsapp, oque dificulta a organização.
 
 ## Público-alvo
 
@@ -27,10 +28,4 @@ Reservas feitas apenas por telefone ou mensagem podem gerar demora, perda de inf
 - RNF03 — As operações devem apresentar mensagens claras de sucesso ou erro.
 - RNF04 — A interface deve possuir contraste, rótulos e navegação compreensíveis.
 
-## Fora do escopo inicial
-
-- Pedidos de comida pela aplicação;
-- Pagamento on-line;
-- Programa de fidelidade;
-- Reserva em várias unidades da pizzaria.
 
