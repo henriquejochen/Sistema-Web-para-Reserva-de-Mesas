@@ -8,7 +8,7 @@ Facilitar o agendamento de mesas pelos clientes e oferecer aos funcionários uma
 
 ## Situação do projeto
 
-O projeto está na fase de prototipação (Entrega 01). Nesta etapa serão definidos o escopo, as telas, o fluxo do usuário, o modelo inicial do banco de dados e a infraestrutura de trabalho.
+O projeto está na fase de prototipação. Nesta etapa serão definidos o escopo, as telas, o fluxo do usuário, o modelo inicial do banco de dados e a infraestrutura de trabalho.
 
 ## Funcionalidades previstas
 
@@ -77,7 +77,7 @@ fix: impede reserva em horário ocupado
 
 ## Equipe
 
-- Kauã Fernandes Ghizzo — UX/UI Front-EndLíder, Scrum Master e QA
+- Kauã Fernandes Ghizzo — Líder, Scrum Master e QA
 - Henrique Jochen de Oliveira — UX/UI Front-End
 - Thiago de Souza Devilla — Back-end
 - Vinicius Nunes Westrup — Adm Banco de Dados (DBA)
