@@ -2,16 +2,16 @@ import type { TableStatus } from "../types/table";
 import type { BookingDraft } from "../types/reservation";
 
 export const colors = {
-  red: "#A6422D",
-  redDark: "#843321",
-  redLight: "#F2E4DC",
-  cream: "#F7F3ED",
-  paper: "#FFFDF9",
-  ink: "#2D2925",
-  muted: "#756C64",
-  border: "#DED6CE",
-  green: "#377550",
-  greenLight: "#E6F2EA",
+  red: "#B82020",
+  redDark: "#8B0000",
+  redLight: "#FDECEA",
+  cream: "#FFF8F3",
+  paper: "#FFFCFA",
+  ink: "#1C1C1C",
+  muted: "#6B6B6B",
+  border: "#E5D8D8",
+  green: "#2E7D4F",
+  greenLight: "#E6F4EC",
   amber: "#B45309",
 };
 

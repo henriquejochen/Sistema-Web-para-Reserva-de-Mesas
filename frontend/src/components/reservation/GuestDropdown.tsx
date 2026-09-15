@@ -16,7 +16,6 @@ export function GuestDropdown({ value, onChange }: GuestDropdownProps) {
         {Array.from({ length: 12 }, (_, i) => i + 1).map((n) => (
           <option key={n} value={n}>
             {n} {n === 1 ? "pessoa" : "pessoas"}{" "}
-            {n === 2 ? "(mesa padrão para casal)" : n === 4 ? "(mesa padrão 4 lugares)" : ""}
           </option>
         ))}
       </select>

@@ -3,6 +3,7 @@ import { colors, inputClass } from "../../constants/theme";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
 import { Field } from "../../components/ui/Field";
+import logo from "../../assets/logo.jpg";
 
 interface RegisterProps {
   go: (s: Screen) => void;
@@ -18,14 +19,14 @@ export function Register({
   return (
     <div className="mx-auto w-full max-w-lg py-6">
       <div className="mb-5 flex items-center gap-3">
-        <div
-          className="flex h-10 w-10 items-center justify-center rounded-xl text-lg"
-          style={{ background: colors.red }}
-        >
-          🍕
-        </div>
+        <img
+          src={logo}
+          alt="Pizzaria Di Napoli"
+          className="h-10 w-10 rounded-xl object-cover flex-shrink-0"
+          style={{ border: `2px solid ${colors.red}` }}
+        />
         <div>
-          <strong className="block text-sm">Forno & Mesa</strong>
+          <strong className="block text-sm" style={{ color: colors.ink }}>Pizzaria Di Napoli</strong>
           <span className="text-xs" style={{ color: colors.muted }}>
             Criar conta
           </span>

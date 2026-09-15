@@ -18,7 +18,27 @@ interface ReserveProps {
 }
 
 export function Reserve({ go, booking, setBooking }: ReserveProps) {
-  const canConfirm = Boolean(booking.date && booking.time);
+
+  // Dom=0, Seg=1, Ter=2 → fechado. Qua=3, Qui…Sab=6 → aberto
+  // Usamos UTC para evitar fuso alterar o dia
+  const isClosedDay = (iso: string) => {
+    if (!iso) return false;
+    const [y, m, d] = iso.split("-").map(Number);
+    const day = new Date(Date.UTC(y, m - 1, d)).getUTCDay();
+    return day === 0 || day === 1 || day === 2; // dom, seg, ter
+  };
+
+  const closedDayWarning = isClosedDay(booking.date);
+  const canConfirm = Boolean(booking.date && booking.time && !closedDayWarning);
+
+
+  const handleDateChange = (value: string) => {
+    if (isClosedDay(value)) {
+      setBooking({ ...booking, date: value, time: "" });
+    } else {
+      setBooking({ ...booking, date: value, time: "" });
+    }
+  };
 
   return (
     <>
@@ -40,7 +60,8 @@ export function Reserve({ go, booking, setBooking }: ReserveProps) {
                   min={todayISO}
                   className={inputClass}
                   value={booking.date}
-                  onChange={(e) => setBooking({ ...booking, date: e.target.value })}
+                  onChange={(e) => handleDateChange(e.target.value)}
+                  style={closedDayWarning ? { borderColor: colors.red } : {}}
                 />
               </Field>
               <Field label="Número de pessoas">
@@ -50,6 +71,11 @@ export function Reserve({ go, booking, setBooking }: ReserveProps) {
                 />
               </Field>
             </div>
+            {closedDayWarning && (
+              <p className="mt-2 text-xs font-medium" style={{ color: colors.red }}>
+                ⚠️ Fechado aos domingos, segundas e terças. Escolha de quarta a sábado.
+              </p>
+            )}
           </Card>
 
           {/* Inline time slot picker */}
@@ -153,10 +179,6 @@ export function Reserve({ go, booking, setBooking }: ReserveProps) {
               background: colors.paper,
             }}
           >
-            <strong className="block" style={{ color: colors.ink }}>
-              Regras de tolerância e chegada
-            </strong>
-            <p>• Cancelamento gratuito com até 2h de antecedência.</p>
             <p>
               • <strong>Após 15 min de atraso</strong>: entraremos em contato para confirmar sua chegada.
             </p>

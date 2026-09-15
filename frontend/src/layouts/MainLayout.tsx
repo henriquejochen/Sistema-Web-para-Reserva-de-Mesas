@@ -1,6 +1,7 @@
 import React from "react";
 import type { Screen, Role, NavigationItem } from "../types/navigation";
 import { colors } from "../constants/theme";
+import logo from "../assets/logo.jpg";
 
 interface MainLayoutProps {
   children: React.ReactNode;
@@ -29,9 +30,8 @@ export function MainLayout({
       style={{ background: colors.cream, color: colors.ink, height: "100vh" }}
     >
       <div
-        className={`mx-auto grid h-full min-h-0 max-w-[1440px] overflow-hidden bg-white sm:rounded-2xl sm:border ${
-          isPublic ? "" : "lg:grid-cols-[220px_1fr]"
-        }`}
+        className={`mx-auto grid h-full min-h-0 max-w-[1440px] overflow-hidden bg-white sm:rounded-2xl sm:border ${isPublic ? "" : "lg:grid-cols-[220px_1fr]"
+          }`}
         style={{ borderColor: colors.border, height: "100%" }}
       >
         {/* Sidebar (Desktop) */}
@@ -40,15 +40,18 @@ export function MainLayout({
             className="hidden border-r p-5 lg:flex lg:flex-col"
             style={{ borderColor: colors.border, background: colors.paper }}
           >
+            {/* Brand header */}
             <div className="mb-7 flex items-center gap-3">
-              <div
-                className="flex h-9 w-9 items-center justify-center rounded-xl text-lg"
-                style={{ background: colors.red }}
-              >
-                🍕
-              </div>
+              <img
+                src={logo}
+                alt="Pizzaria Di Napoli"
+                className="h-11 w-11 rounded-xl object-cover flex-shrink-0"
+                style={{ border: `2px solid ${colors.red}` }}
+              />
               <div>
-                <strong className="block text-sm">Forno & Mesa</strong>
+                <strong className="block text-sm leading-tight" style={{ color: colors.ink }}>
+                  Pizzaria Di Napoli
+                </strong>
                 <span className="text-xs" style={{ color: colors.muted }}>
                   {role === "admin" ? "Equipe" : "Cliente"}
                 </span>
@@ -81,14 +84,16 @@ export function MainLayout({
               <button
                 type="button"
                 onClick={onLogout}
-                className="w-full rounded-lg px-3 py-2.5 text-left text-sm transition cursor-pointer"
-                style={{ color: colors.muted }}
+                className="w-full rounded-lg border px-4 py-2.5 text-sm font-medium transition active:scale-[0.98] cursor-pointer"
+                style={{ background: colors.red, color: "white", borderColor: colors.red }}
               >
                 Sair
               </button>
             </div>
+
           </aside>
         )}
+
 
         {/* Main Content Area */}
         <main className="flex min-h-0 min-w-0 flex-col">
@@ -99,12 +104,12 @@ export function MainLayout({
                 style={{ borderColor: colors.border }}
               >
                 <div className="flex items-center gap-3">
-                  <div
-                    className="flex h-8 w-8 items-center justify-center rounded-lg text-sm lg:hidden"
-                    style={{ background: colors.red }}
-                  >
-                    🍕
-                  </div>
+                  <img
+                    src={logo}
+                    alt="Pizzaria Di Napoli"
+                    className="h-8 w-8 rounded-lg object-cover lg:hidden"
+                    style={{ border: `2px solid ${colors.red}` }}
+                  />
                   <span className="text-sm" style={{ color: colors.muted }}>
                     {currentLabel}
                   </span>

@@ -16,7 +16,7 @@ export function ClientHome({ go }: ClientHomeProps) {
           Olá, Marina 👋
         </h1>
         <p className="mt-1 text-sm" style={{ color: colors.muted }}>
-          Bem-vinda ao Forno & Mesa.
+          Bem-vinda à Pizzaria Di Napoli.
         </p>
       </div>
 
