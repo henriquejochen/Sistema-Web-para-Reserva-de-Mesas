@@ -1,3 +1,4 @@
+import { Icon } from "../ui/Icon";
 import type { AreaPreference } from "../../types/reservation";
 import { colors } from "../../constants/theme";
 import { areaOptions } from "../../constants/tables";
@@ -16,6 +17,7 @@ export function AreaSelector({ value, onChange }: AreaSelectorProps) {
           <button
             key={opt.value}
             type="button"
+            aria-pressed={active}
             onClick={() => onChange(opt.value)}
             className="flex flex-col items-center gap-1.5 rounded-xl border-2 px-3 py-3 text-center transition-all cursor-pointer"
             style={{
@@ -24,7 +26,7 @@ export function AreaSelector({ value, onChange }: AreaSelectorProps) {
               color: active ? colors.redDark : colors.muted,
             }}
           >
-            <span className="text-xl">{opt.icon}</span>
+            <Icon name={opt.icon}/>
             <span className="text-xs font-semibold" style={{ color: active ? colors.redDark : colors.ink }}>
               {opt.label}
             </span>

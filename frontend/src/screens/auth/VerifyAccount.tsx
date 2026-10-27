@@ -1,3 +1,4 @@
+import { Icon } from "../../components/ui/Icon";
 import { useState } from "react";
 import type { Screen, VerificationMethod } from "../../types/navigation";
 import { colors, inputClass } from "../../constants/theme";
@@ -21,7 +22,7 @@ export function VerifyAccount({ go, method }: VerifyAccountProps) {
           className="mx-auto flex h-14 w-14 items-center justify-center rounded-full text-2xl"
           style={{ background: colors.redLight }}
         >
-          {method === "email" ? "✉️" : "📱"}
+          <Icon name="check"/>
         </div>
         <div
           className="mt-4 text-xs font-semibold uppercase tracking-widest"

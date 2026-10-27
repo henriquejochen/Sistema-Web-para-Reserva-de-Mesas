@@ -1,3 +1,4 @@
+import { Icon } from "../ui/Icon";
 import { inputClass, colors } from "../../constants/theme";
 
 interface GuestDropdownProps {
@@ -23,7 +24,7 @@ export function GuestDropdown({ value, onChange }: GuestDropdownProps) {
         className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-3 text-sm"
         style={{ color: colors.muted }}
       >
-        ▼
+        <Icon name="chevron" size={18}/>
       </div>
     </div>
   );

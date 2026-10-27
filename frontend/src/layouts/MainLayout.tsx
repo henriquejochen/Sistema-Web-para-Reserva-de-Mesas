@@ -1,160 +1,18 @@
-import React from "react";
+import type { ReactNode } from "react";
 import type { Screen, Role, NavigationItem } from "../types/navigation";
 import { colors } from "../constants/theme";
+import { Icon, type IconName } from "../components/ui/Icon";
 import logo from "../assets/logo.jpg";
-
-interface MainLayoutProps {
-  children: React.ReactNode;
-  screen: Screen;
-  role: Role;
-  isPublic: boolean;
-  currentLabel: string;
-  visibleNav: NavigationItem[];
-  onNavigate: (s: Screen) => void;
-  onLogout: () => void;
-}
-
-export function MainLayout({
-  children,
-  screen,
-  role,
-  isPublic,
-  currentLabel,
-  visibleNav,
-  onNavigate,
-  onLogout,
-}: MainLayoutProps) {
-  return (
-    <div
-      className="h-screen min-h-[640px] w-full sm:p-3 md:p-5"
-      style={{ background: colors.cream, color: colors.ink, height: "100vh" }}
-    >
-      <div
-        className={`mx-auto grid h-full min-h-0 max-w-[1440px] overflow-hidden bg-white sm:rounded-2xl sm:border ${isPublic ? "" : "lg:grid-cols-[220px_1fr]"
-          }`}
-        style={{ borderColor: colors.border, height: "100%" }}
-      >
-        {/* Sidebar (Desktop) */}
-        {!isPublic && (
-          <aside
-            className="hidden border-r p-5 lg:flex lg:flex-col"
-            style={{ borderColor: colors.border, background: colors.paper }}
-          >
-            {/* Brand header */}
-            <div className="mb-7 flex items-center gap-3">
-              <img
-                src={logo}
-                alt="Pizzaria Di Napoli"
-                className="h-11 w-11 rounded-xl object-cover flex-shrink-0"
-                style={{ border: `2px solid ${colors.red}` }}
-              />
-              <div>
-                <strong className="block text-sm leading-tight" style={{ color: colors.ink }}>
-                  Pizzaria Di Napoli
-                </strong>
-                <span className="text-xs" style={{ color: colors.muted }}>
-                  {role === "admin" ? "Equipe" : "Cliente"}
-                </span>
-              </div>
-            </div>
-
-            <p className="mb-2 text-xs font-semibold uppercase tracking-widest" style={{ color: colors.muted }}>
-              Menu
-            </p>
-
-            <nav className="grid gap-1">
-              {visibleNav.map((item) => (
-                <button
-                  key={item.screen}
-                  type="button"
-                  onClick={() => onNavigate(item.screen)}
-                  className="rounded-lg px-3 py-2.5 text-left text-sm transition cursor-pointer"
-                  style={{
-                    background: screen === item.screen ? colors.redLight : "transparent",
-                    color: screen === item.screen ? colors.redDark : colors.ink,
-                    fontWeight: screen === item.screen ? 600 : 400,
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
-            </nav>
-
-            <div className="mt-auto">
-              <button
-                type="button"
-                onClick={onLogout}
-                className="w-full rounded-lg border px-4 py-2.5 text-sm font-medium transition active:scale-[0.98] cursor-pointer"
-                style={{ background: colors.red, color: "white", borderColor: colors.red }}
-              >
-                Sair
-              </button>
-            </div>
-
-          </aside>
-        )}
-
-
-        {/* Main Content Area */}
-        <main className="flex min-h-0 min-w-0 flex-col">
-          {!isPublic && (
-            <>
-              <header
-                className="flex items-center justify-between border-b px-4 py-3"
-                style={{ borderColor: colors.border }}
-              >
-                <div className="flex items-center gap-3">
-                  <img
-                    src={logo}
-                    alt="Pizzaria Di Napoli"
-                    className="h-8 w-8 rounded-lg object-cover lg:hidden"
-                    style={{ border: `2px solid ${colors.red}` }}
-                  />
-                  <span className="text-sm" style={{ color: colors.muted }}>
-                    {currentLabel}
-                  </span>
-                </div>
-                <button
-                  type="button"
-                  onClick={onLogout}
-                  className="text-sm lg:hidden cursor-pointer"
-                  style={{ color: colors.muted }}
-                >
-                  Sair
-                </button>
-              </header>
-
-              {/* Mobile navigation bar */}
-              <nav
-                className="grid border-b lg:hidden"
-                style={{
-                  borderColor: colors.border,
-                  gridTemplateColumns: `repeat(${visibleNav.length}, 1fr)`,
-                }}
-              >
-                {visibleNav.map((item) => (
-                  <button
-                    key={item.screen}
-                    type="button"
-                    onClick={() => onNavigate(item.screen)}
-                    className="px-2 py-3 text-center text-xs font-medium cursor-pointer"
-                    style={{
-                      background: screen === item.screen ? colors.redLight : colors.paper,
-                      color: screen === item.screen ? colors.redDark : colors.ink,
-                    }}
-                  >
-                    {item.label}
-                  </button>
-                ))}
-              </nav>
-            </>
-          )}
-
-          <div className={`min-h-0 flex-1 ${isPublic ? "" : "overflow-auto p-5 sm:p-6"}`}>
-            {children}
-          </div>
-        </main>
-      </div>
+interface MainLayoutProps {children:ReactNode;screen:Screen;role:Role;isPublic:boolean;currentLabel:string;visibleNav:NavigationItem[];onNavigate:(s:Screen)=>void;onLogout:()=>void}
+const icons: Partial<Record<Screen,IconName>>={client:"home",reserve:"calendar","my-reservations":"search",admin:"home",daily:"calendar",tables:"table"};
+export function MainLayout({children,screen,role,isPublic,currentLabel,visibleNav,onNavigate,onLogout}:MainLayoutProps) {
+  if(isPublic)return <main style={{color:colors.ink,background:colors.paper}}>{children}</main>;
+  return <div className="min-h-dvh" style={{background:colors.cream,color:colors.ink}}>
+    <header className="border-b bg-white px-4 sm:px-6" style={{borderColor:colors.border}}><div className="max-w-6xl mx-auto flex min-h-20 items-center justify-between gap-3"><button type="button" onClick={()=>onNavigate(role==="admin"?"admin":"client")} className="flex items-center gap-3 min-h-12 text-left"><img src={logo} alt="" className="h-11 w-11 rounded-xl object-cover"/><span><strong className="block font-brand text-base sm:text-xl">Pizzaria Di Napoli</strong><span className="block text-xs" style={{color:colors.muted}}>{role==="admin"?"Área da equipe":"Reservas todos os dias"}</span></span></button>{role==="admin"&&<button type="button" onClick={onLogout} className="flex items-center justify-center gap-2 min-h-12 px-3 text-sm"><Icon name="logout" size={18}/>Sair</button>}</div></header>
+    <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-[200px_minmax(0,1fr)]">
+      <aside className="hidden lg:block py-8 pr-5"><nav aria-label="Menu principal" className="grid gap-2">{visibleNav.map(n=><button type="button" key={n.screen} onClick={()=>onNavigate(n.screen)} aria-current={screen===n.screen?"page":undefined} className="flex items-center gap-3 text-left min-h-12 rounded-xl px-4 text-sm" style={{background:screen===n.screen?colors.redLight:"transparent",color:screen===n.screen?colors.redDark:colors.ink}}><Icon name={icons[n.screen]??"home"} size={20}/>{n.label}</button>)}</nav></aside>
+      <main className="min-w-0 px-4 py-6 sm:px-6 lg:py-8 pb-28 lg:pb-10" aria-label={currentLabel}>{children}</main>
     </div>
-  );
+    <nav aria-label="Menu principal no celular" className="mobile-nav fixed z-20 bottom-0 inset-x-0 grid grid-cols-3 border-t bg-white lg:hidden" style={{borderColor:colors.border}}>{visibleNav.map(n=><button key={n.screen} type="button" onClick={()=>onNavigate(n.screen)} aria-current={screen===n.screen?"page":undefined} className="flex flex-col items-center justify-center gap-1 px-1 py-3 min-h-16 text-[11px] font-medium" style={{color:screen===n.screen?colors.redDark:colors.muted,background:screen===n.screen?colors.redLight:"white"}}><Icon name={icons[n.screen]??"home"} size={22}/>{n.label}</button>)}</nav>
+  </div>;
 }

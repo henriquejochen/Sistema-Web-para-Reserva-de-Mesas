@@ -4,7 +4,6 @@ export type Screen =
   | "verify"
   | "client"
   | "reserve"
-  | "times"
   | "confirmation"
   | "my-reservations"
   | "admin"

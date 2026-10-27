@@ -1,4 +1,5 @@
 import type { RestaurantTable } from "../types/table";
+import type { IconName } from "../components/ui/Icon";
 import type { AreaPreference } from "../types/reservation";
 
 export const restaurantTables: RestaurantTable[] = [
@@ -20,15 +21,8 @@ export const restaurantTables: RestaurantTable[] = [
   { number: 14, capacity: 4, area: "externa", column: "3 / span 2", row: "9" },
 ];
 
-export const areaOptions: { value: AreaPreference; label: string; icon: string; desc: string }[] = [
-  { value: "interna", label: "Interno", icon: "🏠", desc: "Salão interno, climatizado" },
-  { value: "externa", label: "Rua", icon: "🌿", desc: "Área externa, ao ar livre" },
-  { value: "any", label: "Sem preferência", icon: "✨", desc: "O restaurante escolhe" },
+export const areaOptions: { value: AreaPreference; label: string; icon: IconName; desc: string }[] = [
+  { value: "interna", label: "Interno", icon: "home", desc: "Salão interno, climatizado" },
+  { value: "externa", label: "Rua", icon: "leaf", desc: "Área externa, ao ar livre" },
+  { value: "any", label: "Sem preferência", icon: "check", desc: "O restaurante escolhe" },
 ];
-
-export const allSlots = [
-  "18:00", "18:30", "19:00", "19:30", "20:00",
-  "20:30", "21:00", "21:30", "22:00", "22:30",
-];
-
-export const fullSlots = new Set(["19:30", "18:00"]);

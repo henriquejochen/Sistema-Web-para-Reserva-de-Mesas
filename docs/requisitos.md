@@ -14,19 +14,19 @@ A aplicação tem como objetivo centralizar o processo de reserva de mesas em um
 
 ## Requisitos funcionais
 
-RF01 - O sistema deve permitir que o cliente consulte a disponibilidade de mesas informando data, horário e quantidade de pessoas.
+RF01 - O sistema deve permitir que o cliente consulte a disponibilidade de mesas informando dia e quantidade de pessoas.
 
-RF02 - O sistema deve apresentar ao cliente as opções de mesas ou horários disponíveis conforme os dados informados na consulta.
+RF02 - O sistema deve apresentar ao cliente as opções de mesas disponíveis para o dia conforme os dados informados na consulta.
 
-RF03 - O sistema deve permitir que o cliente informe seus dados pessoais para realizar uma reserva, como nome, telefone e e-mail.
+RF03 - O sistema deve solicitar nome e telefone com DDD somente ao finalizar a reserva, sem exigir conta, senha ou data de nascimento.
 
-RF04 - O sistema deve permitir que o cliente confirme uma reserva após revisar os dados informados.
+RF04 - O sistema deve permitir que o cliente confirme uma reserva após revisar os dados informados, incluindo a previsão de chegada.
 
-RF05 - O sistema deve gerar uma confirmação da reserva contendo data, horário, quantidade de pessoas, mesa reservada e código da reserva.
+RF05 - O sistema deve gerar uma confirmação da reserva contendo data, previsão de chegada, quantidade de pessoas, mesa reservada e código da reserva.
 
-RF06 - O sistema deve permitir que o cliente consulte suas reservas futuras.
+RF06 - O sistema deve permitir que o cliente consulte uma reserva por seu link exclusivo, sem liberar histórico pelo telefone ou pelo código curto da reserva.
 
-RF07 - O sistema deve permitir que o cliente cancele uma reserva futura.
+RF07 - O sistema deve permitir que o cliente cancele uma reserva futura pelo link exclusivo, solicitando confirmação. Se perder o link, deve ser orientado a contatar a pizzaria.
 
 RF08 - O sistema deve permitir que o administrador cadastre novas mesas.
 
@@ -42,7 +42,7 @@ RF13 - O sistema deve permitir que o administrador altere o status de uma reserv
 
 RF14 - O sistema deve permitir que o funcionário confirme a chegada do cliente ao estabelecimento.
 
-RF15 - O sistema deve impedir o cadastro de reservas com conflito de horário para a mesma mesa.
+RF15 - O sistema deve impedir o cadastro de reservas com conflito de disponibilidade no dia para a mesma mesa.
 
 RF16 - O sistema deve validar se a mesa escolhida possui capacidade suficiente para a quantidade de pessoas informada.
 
@@ -84,9 +84,9 @@ RNF15 - A aplicação deve ser compatível com navegadores modernos.
 
 ## Regras de negócio
 
-RN01 - Uma mesa não pode possuir duas reservas ativas no mesmo dia e horário.
+RN01 - Uma mesa não pode possuir duas reservas ativas no mesmo dia.
 
-RN02 - Uma reserva só pode ser criada se existir pelo menos uma mesa ativa disponível para a data, horário e quantidade de pessoas informados.
+RN02 - Uma reserva só pode ser criada se existir pelo menos uma mesa ativa disponível para o dia e a quantidade de pessoas informados.
 
 RN03 - A quantidade de pessoas da reserva não pode ser maior que a capacidade da mesa selecionada.
 
@@ -112,9 +112,9 @@ RN13 - A chegada do cliente deve ser confirmada por um funcionário ou administr
 
 RN14 - Caso não exista mesa disponível para o horário solicitado, o sistema deve informar a indisponibilidade e sugerir que o cliente escolha outra data ou horário.
 
-RN15 - O sistema deve considerar a data e o horário da reserva para validar disponibilidade.
+RN15 - O sistema deve considerar o dia da reserva para validar disponibilidade; a previsão de chegada serve somente para recepção e atraso.
 
-RN16 - Não deve ser permitido criar reserva com data ou horário inválido.
+RN16 - Não deve ser permitido criar reserva com data ou previsão de chegada inválida.
 
 RN17 - O código da reserva deve ser único, permitindo identificar a reserva posteriormente.
 
@@ -123,6 +123,12 @@ RN18 - Alterações em mesas, como capacidade ou inativação, não devem apagar
 RN19 - Apenas usuários administrativos podem cadastrar, editar ou inativar mesas.
 
 RN20 - Apenas usuários administrativos podem visualizar o painel geral de reservas.
+
+RN21 - A pizzaria aceita reservas todos os dias. O rodízio funciona de quarta a sábado.
+
+RN22 - O cliente deve informar uma previsão de chegada. Essa informação não divide a reserva em faixas de horário.
+
+RN23 - Após 15 minutos de atraso, a equipe recebe um alerta visual. Após 30 minutos, pode confirmar o cancelamento por ausência para realocar a mesa; essa ação não é automática e não se aplica a grupos presentes ou concluídos.
 
 ## Atores do sistema
 
@@ -136,7 +142,7 @@ Para a primeira versão do sistema, a prioridade deve ser:
 
 1. Consulta de disponibilidade.
 2. Cadastro e confirmação de reserva.
-3. Validação de conflito de horário.
+3. Validação de conflito de disponibilidade por dia.
 4. Validação da capacidade da mesa.
 5. Consulta e cancelamento de reservas pelo cliente.
 6. Painel administrativo para visualização e atualização de reservas.
