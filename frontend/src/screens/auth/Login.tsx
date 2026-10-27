@@ -74,10 +74,10 @@ export function Login({ go }: LoginProps) {
       <div className="flex items-center justify-center bg-white px-8 py-10">
         <div className="w-full max-w-sm">
           <h2 className="text-xl font-semibold" style={{ color: colors.ink }}>
-            Entrar
+            Acesso da equipe
           </h2>
           <p className="mt-1 text-sm" style={{ color: colors.muted }}>
-            Acesse sua conta para fazer ou gerenciar reservas.
+            Área de demonstração para funcionários e administradores.
           </p>
 
           <div className="mt-6 grid gap-4">
@@ -89,24 +89,11 @@ export function Login({ go }: LoginProps) {
               <input className={inputClass} placeholder="••••••••" type="password" />
             </Field>
 
-            <Button primary full onClick={() => go("client")}>
-              Entrar
+            <Button primary full onClick={() => go("admin")}>
+              Entrar como equipe (protótipo)
             </Button>
-            <Button full onClick={() => go("admin")}>
-              Entrar como equipe
-            </Button>
-
-            <p className="text-center text-sm" style={{ color: colors.muted }}>
-              Não tem conta?{" "}
-              <button
-                type="button"
-                onClick={() => go("register")}
-                className="font-medium underline cursor-pointer"
-                style={{ color: colors.red }}
-              >
-                Criar agora
-              </button>
-            </p>
+            <Button full onClick={() => go("client")}>Voltar ao site do cliente</Button>
+            <p className="text-xs" style={{color: colors.muted}}>Autenticação simulada no protótipo. O acesso real da equipe exigirá validação no servidor.</p>
           </div>
         </div>
       </div>

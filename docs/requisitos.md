@@ -18,15 +18,15 @@ RF01 - O sistema deve permitir que o cliente consulte a disponibilidade de mesas
 
 RF02 - O sistema deve apresentar ao cliente as opções de mesas ou horários disponíveis conforme os dados informados na consulta.
 
-RF03 - O sistema deve permitir que o cliente informe seus dados pessoais para realizar uma reserva, como nome, telefone e e-mail.
+RF03 - O sistema deve solicitar nome e telefone com DDD somente ao finalizar a reserva, sem exigir conta, senha ou data de nascimento.
 
 RF04 - O sistema deve permitir que o cliente confirme uma reserva após revisar os dados informados.
 
 RF05 - O sistema deve gerar uma confirmação da reserva contendo data, horário, quantidade de pessoas, mesa reservada e código da reserva.
 
-RF06 - O sistema deve permitir que o cliente consulte suas reservas futuras.
+RF06 - O sistema deve permitir que o cliente consulte uma reserva por seu link exclusivo, sem liberar histórico pelo telefone ou pelo código curto da reserva.
 
-RF07 - O sistema deve permitir que o cliente cancele uma reserva futura.
+RF07 - O sistema deve permitir que o cliente cancele uma reserva futura pelo link exclusivo, solicitando confirmação. Se perder o link, deve ser orientado a contatar a pizzaria.
 
 RF08 - O sistema deve permitir que o administrador cadastre novas mesas.
 

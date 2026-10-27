@@ -88,9 +88,9 @@ export function Times({ go, booking, setBooking }: TimesProps) {
                 primary
                 full
                 disabled={!booking.time}
-                onClick={() => go("confirmation")}
+                onClick={() => go("reserve")}
               >
-                Confirmar {booking.time || "horário"} →
+                Informar meus dados →
               </Button>
               <Button full onClick={() => go("reserve")}>
                 Voltar

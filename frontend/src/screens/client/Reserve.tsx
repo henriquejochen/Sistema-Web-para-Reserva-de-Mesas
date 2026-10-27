@@ -1,5 +1,5 @@
 import type { Screen } from "../../types/navigation";
-import type { BookingDraft } from "../../types/reservation";
+import type { BookingDraft, GuestContact } from "../../types/reservation";
 import { colors, inputClass, todayISO } from "../../constants/theme";
 import { allSlots, fullSlots } from "../../constants/tables";
 import { PageTitle } from "../../components/ui/PageTitle";
@@ -15,9 +15,13 @@ interface ReserveProps {
   go: (s: Screen) => void;
   booking: BookingDraft;
   setBooking: (b: BookingDraft) => void;
+  contact: GuestContact;
+  setContact: (c: GuestContact) => void;
+  onConfirm: () => void;
+  error: string;
 }
 
-export function Reserve({ go, booking, setBooking }: ReserveProps) {
+export function Reserve({ go, booking, setBooking, contact, setContact, onConfirm, error }: ReserveProps) {
 
   // Dom=0, Seg=1, Ter=2 → fechado. Qua=3, Qui…Sab=6 → aberto
   // Usamos UTC para evitar fuso alterar o dia
@@ -29,7 +33,7 @@ export function Reserve({ go, booking, setBooking }: ReserveProps) {
   };
 
   const closedDayWarning = isClosedDay(booking.date);
-  const canConfirm = Boolean(booking.date && booking.time && !closedDayWarning);
+  const canConfirm = Boolean(booking.date >= todayISO && booking.time && !closedDayWarning && contact.name.trim().length >= 2 && /^(?:[0-9]{10}|[0-9]{11})$/.test(contact.phone.replace(/\D/g, "")) && new Date(booking.date + "T" + booking.time) > new Date());
 
 
   const handleDateChange = (value: string) => {
@@ -42,6 +46,7 @@ export function Reserve({ go, booking, setBooking }: ReserveProps) {
 
   return (
     <>
+      <p className="mb-4 text-xs" style={{color: colors.muted}}>Protótipo: use dados fictícios. Horários ilustrativos; nenhuma reserva é enviada à pizzaria.</p>
       <PageTitle
         title="Nova reserva"
         subtitle="Escolha a data, horário e preferência de área para confirmar."
@@ -131,6 +136,14 @@ export function Reserve({ go, booking, setBooking }: ReserveProps) {
             />
           </Card>
 
+          <Card>
+            <h2 className="mb-2 font-semibold">Seus dados para finalizar</h2>
+            <p className="mb-4 text-sm" style={{color: colors.muted}}>Sem cadastro e sem senha. O telefone será usado apenas para contato, sem envio de código.</p>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div><label htmlFor="guest-name" className="block mb-1 text-sm">Nome</label><input id="guest-name" autoComplete="name" required maxLength={80} className={inputClass} value={contact.name} onChange={e => setContact({...contact, name: e.target.value})}/></div>
+              <div><label htmlFor="guest-phone" className="block mb-1 text-sm">Telefone com DDD</label><input id="guest-phone" type="tel" autoComplete="tel-national" required maxLength={20} placeholder="(48) 99999-0000" className={inputClass} value={contact.phone} onChange={e => setContact({...contact, phone: e.target.value})}/><p className="mt-1 text-xs">Informe 10 ou 11 dígitos, incluindo DDD.</p></div>
+            </div>
+          </Card>
           {/* Note */}
           <Card>
             <Field label="Observação" hint="opcional">
@@ -152,6 +165,7 @@ export function Reserve({ go, booking, setBooking }: ReserveProps) {
               Resumo
             </h3>
             <BookingSummary booking={booking} />
+            {error && <p role="alert" className="mt-3 text-sm">{error}</p>}
             <div className="my-4">
               <Divider />
             </div>
@@ -160,9 +174,9 @@ export function Reserve({ go, booking, setBooking }: ReserveProps) {
                 primary
                 full
                 disabled={!canConfirm}
-                onClick={() => go("confirmation")}
+                onClick={onConfirm}
               >
-                {canConfirm ? `Confirmar reserva às ${booking.time} →` : "Selecione um horário"}
+                {canConfirm ? `Confirmar reserva às ${booking.time} →` : "Preencha data, horário, nome e telefone"}
               </Button>
               <Button full onClick={() => go("client")}>
                 Cancelar

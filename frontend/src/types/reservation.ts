@@ -9,3 +9,10 @@ export type BookingDraft = {
   time: string;
   note: string;
 };
+
+export type GuestContact = { name: string; phone: string };
+export type GuestReservation = BookingDraft & GuestContact & {
+  token: string;
+  code: string;
+  status: "Confirmada" | "Cancelada";
+};

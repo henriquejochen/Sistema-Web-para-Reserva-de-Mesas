@@ -2,7 +2,7 @@ import type { Screen } from "../../types/navigation";
 import { colors } from "../../constants/theme";
 import { Button } from "../../components/ui/Button";
 import { Card } from "../../components/ui/Card";
-import { StatusBadge } from "../../components/ui/StatusBadge";
+
 
 interface ClientHomeProps {
   go: (s: Screen) => void;
@@ -13,10 +13,10 @@ export function ClientHome({ go }: ClientHomeProps) {
     <>
       <div className="mb-7">
         <h1 className="text-2xl font-semibold" style={{ color: colors.ink }}>
-          Olá, Marina 👋
+          Bem-vindo à Di Napoli
         </h1>
         <p className="mt-1 text-sm" style={{ color: colors.muted }}>
-          Bem-vinda à Pizzaria Di Napoli.
+          Reserve sem criar conta. Informe seus dados somente ao finalizar.
         </p>
       </div>
 
@@ -37,30 +37,7 @@ export function ClientHome({ go }: ClientHomeProps) {
         </div>
       </Card>
 
-      {/* Next reservation */}
-      <Card className="mb-4">
-        <div className="mb-3 flex items-center justify-between">
-          <span className="text-xs font-semibold uppercase tracking-widest" style={{ color: colors.muted }}>
-            Próxima reserva
-          </span>
-          <StatusBadge status="Confirmada" />
-        </div>
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div>
-            <p className="text-lg font-semibold" style={{ color: colors.ink }}>
-              Sábado, 19/09 · 20:00
-            </p>
-            <p className="mt-1 text-sm" style={{ color: colors.muted }}>
-              3 pessoas · 🏠 Salão interno · #R-1048
-            </p>
-          </div>
-          <div className="flex gap-2">
-            <Button onClick={() => go("my-reservations")}>Ver detalhes</Button>
-            <Button danger>Cancelar</Button>
-          </div>
-        </div>
-      </Card>
-
+      <Card className="mb-4"><h2 className="font-semibold">Já fez uma reserva?</h2><p className="mt-2 mb-4 text-sm">Use o link exclusivo salvo na confirmação para consultar ou cancelar sua reserva.</p><Button onClick={() => go("my-reservations")}>Consultar pelo link</Button></Card>
       {/* Secondary actions */}
       <div className="grid gap-3 sm:grid-cols-2">
         <button
@@ -71,10 +48,10 @@ export function ClientHome({ go }: ClientHomeProps) {
         >
           <div className="text-xl mb-1">🗂️</div>
           <div className="text-sm font-semibold" style={{ color: colors.ink }}>
-            Minhas reservas
+            Consultar reserva
           </div>
           <div className="text-xs mt-0.5" style={{ color: colors.muted }}>
-            Histórico e próximas
+            Acesso pelo link exclusivo
           </div>
         </button>
         <button

@@ -87,7 +87,7 @@ export function MainLayout({
                 className="w-full rounded-lg border px-4 py-2.5 text-sm font-medium transition active:scale-[0.98] cursor-pointer"
                 style={{ background: colors.red, color: "white", borderColor: colors.red }}
               >
-                Sair
+                {role === "admin" ? "Sair" : "Acesso da equipe"}
               </button>
             </div>
 
@@ -120,7 +120,7 @@ export function MainLayout({
                   className="text-sm lg:hidden cursor-pointer"
                   style={{ color: colors.muted }}
                 >
-                  Sair
+                  {role === "admin" ? "Sair" : "Acesso da equipe"}
                 </button>
               </header>
 

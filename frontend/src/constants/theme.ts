@@ -24,7 +24,7 @@ export const tableStatusPalette: Record<TableStatus, { bg: string; border: strin
 export const inputClass =
   "w-full rounded-lg border bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#A6422D] focus:ring-2 focus:ring-[#A6422D22]";
 
-export const todayISO = new Date().toISOString().split("T")[0];
+export const todayISO = new Date().toLocaleDateString("en-CA");
 
 export const defaultBooking: BookingDraft = {
   date: todayISO,
