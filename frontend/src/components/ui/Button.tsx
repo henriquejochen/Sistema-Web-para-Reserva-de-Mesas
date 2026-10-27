@@ -47,7 +47,7 @@ export function Button({
       type={type}
       onClick={onClick}
       disabled={disabled}
-      className={`rounded-lg border px-4 py-2.5 text-sm font-medium transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer ${
+      className={`inline-flex items-center justify-center gap-2 min-h-12 rounded-lg border px-4 py-3 text-sm font-medium transition active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40 cursor-pointer ${
         full ? "w-full" : ""
       }`}
       style={{ background: bg, color, borderColor: border }}

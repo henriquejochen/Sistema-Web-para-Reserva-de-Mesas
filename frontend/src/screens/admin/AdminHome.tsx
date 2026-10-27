@@ -1,88 +1,21 @@
 import type { Screen } from "../../types/navigation";
-import { colors } from "../../constants/theme";
+import { colors, localDateISO } from "../../constants/theme";
+import { areaOptions } from "../../constants/tables";
 import { PageTitle } from "../../components/ui/PageTitle";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
+import { Icon } from "../../components/ui/Icon";
+import { usePrototypeReservations } from "../../hooks/usePrototypeReservations";
 
-interface AdminHomeProps {
-  go: (s: Screen) => void;
-}
-
-export function AdminHome({ go }: AdminHomeProps) {
-  const stats = [
-    { label: "Reservas hoje", value: "18" },
-    { label: "Aguardando chegada", value: "7" },
-    { label: "Mesas ocupadas", value: "6/16" },
-  ];
-
-  return (
-    <>
-      <PageTitle
-        title="Painel"
-        subtitle="Sexta-feira, 12 de setembro de 2026"
-        action={<Button onClick={() => go("tables")}>Gerenciar mesas</Button>}
-      />
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        {stats.map(({ label, value }) => (
-          <Card key={label}>
-            <p className="text-sm" style={{ color: colors.muted }}>
-              {label}
-            </p>
-            <strong className="mt-1 block text-2xl">{value}</strong>
-          </Card>
-        ))}
-      </div>
-
-      <div className="mt-4 grid gap-4 md:grid-cols-2">
-        <Card>
-          <h2 className="font-semibold" style={{ color: colors.ink }}>
-            Próximas chegadas
-          </h2>
-          <div className="mt-4 grid gap-3">
-            {[
-              { time: "19:30", name: "Carlos Mendes", guests: 4, area: "Dentro" },
-              { time: "20:00", name: "Marina Lima", guests: 3, area: "Rua" },
-            ].map((r) => (
-              <div key={r.name} className="flex items-center justify-between">
-                <div>
-                  <strong className="text-sm" style={{ color: colors.ink }}>
-                    {r.time} · {r.name}
-                  </strong>
-                  <p className="text-xs mt-0.5" style={{ color: colors.muted }}>
-                    {r.guests} pessoas · {r.area}
-                  </p>
-                </div>
-                <span
-                  className="text-xs font-medium px-2 py-1 rounded-full"
-                  style={{ background: colors.greenLight, color: colors.green }}
-                >
-                  Confirmada
-                </span>
-              </div>
-            ))}
-          </div>
-          <div className="mt-5">
-            <Button primary onClick={() => go("daily")}>
-              Ver todas as reservas
-            </Button>
-          </div>
-        </Card>
-
-        <Card>
-          <h2 className="font-semibold" style={{ color: colors.ink }}>
-            Acesso rápido
-          </h2>
-          <div className="mt-4 grid gap-2">
-            <Button full onClick={() => go("daily")}>
-              Confirmar chegada de cliente
-            </Button>
-            <Button full onClick={() => go("tables")}>
-              Ver planta das mesas
-            </Button>
-          </div>
-        </Card>
-      </div>
-    </>
-  );
+export function AdminHome({go}: {go:(s:Screen)=>void}) {
+  const {reservations,error}=usePrototypeReservations();
+  const today=reservations.filter(r=>r.date===localDateISO());
+  const waiting=today.filter(r=>r.status==="Confirmada");
+  const stats=[{label:"Reservas hoje",value:today.filter(r=>r.status!=="Cancelada").length},{label:"Aguardando chegada",value:waiting.length},{label:"Grupos presentes",value:today.filter(r=>r.status==="Presente").length}];
+  return <>
+    <PageTitle title="Painel da equipe" subtitle={new Date().toLocaleDateString("pt-BR",{weekday:"long",day:"numeric",month:"long"})} action={<Button onClick={()=>go("tables")}>Gerenciar mesas</Button>}/>
+    {error&&<p role="alert" className="mb-4">{error}</p>}
+    <div className="grid gap-3 sm:grid-cols-3">{stats.map(s=><Card key={s.label}><p className="text-sm" style={{color:colors.muted}}>{s.label}</p><strong className="mt-2 block text-3xl">{s.value}</strong></Card>)}</div>
+    <div className="grid gap-4 mt-4 md:grid-cols-2"><Card><h2 className="font-semibold">Chegadas previstas para hoje</h2><div className="mt-4 grid gap-4">{waiting.length===0&&<p className="text-sm" style={{color:colors.muted}}>Nenhum grupo aguardando chegada.</p>}{waiting.slice(0,5).map(r=><div key={r.token} className="flex items-start gap-3"><Icon name="clock" size={20} className="shrink-0 mt-1"/><div className="min-w-0"><strong className="text-sm break-words">{r.arrivalTime || "Sem previsão"} · {r.name}</strong><p className="mt-1 text-xs" style={{color:colors.muted}}>{r.guests} pessoas · {areaOptions.find(a=>a.value===r.area)?.label}</p></div></div>)}</div><div className="mt-5"><Button primary full onClick={()=>go("daily")}>Ver reservas e atrasos</Button></div></Card><Card><h2 className="font-semibold">Acesso rápido</h2><div className="mt-4 grid gap-3"><Button full onClick={()=>go("daily")}><Icon name="calendar" size={18}/>Reservas por dia</Button><Button full onClick={()=>go("tables")}><Icon name="table" size={18}/>Gerenciar mesas</Button></div><p className="mt-5 text-xs" style={{color:colors.muted}}>Dados de teste deste navegador. A reserva continua vinculada ao dia; a previsão de chegada ajuda a organizar a recepção.</p></Card></div>
+  </>;
 }

@@ -1,3 +1,4 @@
+import { Icon } from "../../components/ui/Icon";
 import { useState } from "react";
 import type { Screen } from "../../types/navigation";
 import type { GuestReservation } from "../../types/reservation";
@@ -22,7 +23,7 @@ export function MyReservations({ go, reservation, invalidLink, openLink, onCance
         <form className="grid gap-4" onSubmit={e => {e.preventDefault(); setInvalid(!openLink(link));}}>
           <label htmlFor="access-link" className="text-sm font-semibold">Link da sua reserva</label>
           <input id="access-link" type="url" required className={inputClass} value={link} onChange={e => setLink(e.target.value)} placeholder="Cole o link que você salvou"/>
-          <Button primary type="submit">Consultar reserva</Button>
+          <Button primary type="submit"><Icon name="search" size={18}/>Consultar reserva</Button>
         </form>
         <p className="mt-4 text-sm">Perdeu o link? Entre em contato com a pizzaria. Nome, telefone e código de identificação não liberam acesso à reserva.</p>
         <p className="mt-3 text-xs">Protótipo local: links funcionam somente no mesmo navegador e endereço. Limpar os dados do navegador apaga as reservas de teste.</p>

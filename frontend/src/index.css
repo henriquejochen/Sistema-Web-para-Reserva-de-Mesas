@@ -11,3 +11,15 @@ html, body, #root {
 .font-brand {
   font-family: 'Playfair Display', Georgia, serif;
 }
+
+/* Controles confortáveis no celular e conteúdo que acompanha o teclado. */
+html { -webkit-text-size-adjust: 100%; }
+button, a, input, select, textarea { -webkit-tap-highlight-color: transparent; }
+button, a { touch-action: manipulation; }
+button { cursor: pointer; }
+:focus-visible { outline: 3px solid #8B0000; outline-offset: 3px; }
+input[type="date"] { display: block; width: 100%; max-width: 100%; min-width: 0; }
+input, select, textarea { font-size: 16px; }
+.mobile-nav { padding-bottom: env(safe-area-inset-bottom, 0px); }
+@supports not (min-height: 100dvh) { .min-h-dvh { min-height: 100vh; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; } }

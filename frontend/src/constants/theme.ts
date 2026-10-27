@@ -22,14 +22,17 @@ export const tableStatusPalette: Record<TableStatus, { bg: string; border: strin
 };
 
 export const inputClass =
-  "w-full rounded-lg border bg-white px-3 py-2.5 text-sm outline-none transition focus:border-[#A6422D] focus:ring-2 focus:ring-[#A6422D22]";
+  "w-full rounded-lg border bg-white min-h-12 min-w-0 px-3 py-3 text-base outline-none transition focus:border-[#A6422D] focus:ring-2 focus:ring-[#A6422D22]";
 
-export const todayISO = new Date().toLocaleDateString("en-CA");
+export function localDateISO(date = new Date()) {
+  return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-");
+}
+export const todayISO = localDateISO();
 
 export const defaultBooking: BookingDraft = {
   date: todayISO,
+  arrivalTime: "",
   guests: 2,
   area: "any",
-  time: "",
   note: "",
 };

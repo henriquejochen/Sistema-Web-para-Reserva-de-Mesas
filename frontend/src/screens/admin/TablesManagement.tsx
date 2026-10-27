@@ -1,3 +1,4 @@
+import { Icon, type IconName } from "../../components/ui/Icon";
 import { useState } from "react";
 import type { RestaurantTable, TableStatus } from "../../types/table";
 import { colors, inputClass, tableStatusPalette } from "../../constants/theme";
@@ -48,15 +49,15 @@ export function TablesManagement() {
     setSelected(null);
   };
 
-  const groups: { label: string; icon: string; tables: RestaurantTable[] }[] = [
+  const groups: { label: string; icon: IconName; tables: RestaurantTable[] }[] = [
     {
       label: "Salão interno",
-      icon: "🏠",
+      icon: "home",
       tables: [...restaurantTables.filter((t) => t.area === "interna")].sort((a, b) => a.number - b.number),
     },
     {
       label: "Área externa / Rua",
-      icon: "🌿",
+      icon: "leaf",
       tables: [...restaurantTables.filter((t) => t.area === "externa")].sort((a, b) => a.number - b.number),
     },
   ];
@@ -75,7 +76,7 @@ export function TablesManagement() {
           {groups.map(({ label, icon, tables }) => (
             <Card key={label}>
               <div className="mb-4 flex items-center gap-2">
-                <span className="text-lg">{icon}</span>
+                <Icon name={icon}/>
                 <div>
                   <h2 className="font-semibold" style={{ color: colors.ink }}>
                     {label}
@@ -132,7 +133,7 @@ export function TablesManagement() {
         </div>
 
         {/* Edit panel */}
-        <div className="self-start grid gap-3">
+        <div className={`self-start grid gap-3 ${selected !== null ? "order-first xl:order-last" : ""}`}>
           {selected !== null ? (
             (() => {
               const t = restaurantTables.find((r) => r.number === selected)!;
@@ -144,7 +145,7 @@ export function TablesManagement() {
                         Mesa {String(selected).padStart(2, "0")}
                       </h2>
                       <p className="mt-0.5 text-xs" style={{ color: colors.muted }}>
-                        {t.area === "externa" ? "🌿 Área externa" : "🏠 Salão interno"}
+                        {t.area === "externa" ? "Área externa" : "Salão interno"}
                       </p>
                     </div>
                     <button
