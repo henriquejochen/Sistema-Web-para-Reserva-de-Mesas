@@ -1,33 +1,113 @@
-import { Icon } from "../../components/ui/Icon";
 import { useState } from "react";
 import type { Screen } from "../../types/navigation";
 import type { GuestReservation } from "../../types/reservation";
+import type { Configuration } from "../../services/backend";
+import { demoMode } from "../../services/backend";
 import { inputClass } from "../../constants/theme";
 import { PageTitle } from "../../components/ui/PageTitle";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { ReservationAccess } from "../../components/reservation/ReservationAccess";
-
-export function MyReservations({ go, reservation, invalidLink, openLink, onCancel, error }: {
-  go: (s: Screen) => void; reservation: GuestReservation | null;
-  invalidLink: boolean; openLink: (link: string) => boolean; onCancel: () => void; error: string;
+export function MyReservations({
+  go,
+  reservation,
+  openLink,
+  onCancel,
+  busy,
+  error,
+  retry,
+  config,
+}: {
+  go: (s: Screen) => void;
+  reservation: GuestReservation | null;
+  openLink: (link: string) => Promise<void>;
+  onCancel: () => Promise<void>;
+  busy: boolean;
+  error: string;
+  retry: () => void;
+  config: Configuration;
 }) {
   const [link, setLink] = useState("");
-  const [invalid, setInvalid] = useState(false);
-  return <>
-    <PageTitle title="Consultar reserva" subtitle="Acesse uma reserva usando o link exclusivo recebido na confirmação." action={<Button primary onClick={() => go("reserve")}>+ Nova reserva</Button>}/>
-    <div className="max-w-xl mx-auto grid gap-4">
-      {(invalidLink || invalid) && <p role="alert">Link inválido ou reserva não encontrada neste navegador. Confira o link e o navegador em que fez a reserva.</p>}
-      {error && <p role="alert">{error}</p>}
-      {reservation ? <Card><ReservationAccess key={reservation.token} reservation={reservation} onCancel={onCancel}/></Card> : <Card>
-        <form className="grid gap-4" onSubmit={e => {e.preventDefault(); setInvalid(!openLink(link));}}>
-          <label htmlFor="access-link" className="text-sm font-semibold">Link da sua reserva</label>
-          <input id="access-link" type="url" required className={inputClass} value={link} onChange={e => setLink(e.target.value)} placeholder="Cole o link que você salvou"/>
-          <Button primary type="submit"><Icon name="search" size={18}/>Consultar reserva</Button>
-        </form>
-        <p className="mt-4 text-sm">Perdeu o link? Entre em contato com a pizzaria. Nome, telefone e código de identificação não liberam acesso à reserva.</p>
-        <p className="mt-3 text-xs">Protótipo local: links funcionam somente no mesmo navegador e endereço. Limpar os dados do navegador apaga as reservas de teste.</p>
-      </Card>}
-    </div>
-  </>;
+  return (
+    <>
+      <PageTitle
+        title="Consultar reserva"
+        subtitle="Use o link exclusivo salvo na confirmação."
+        action={
+          <Button primary disabled={busy} onClick={() => go("reserve")}>
+            + Nova reserva
+          </Button>
+        }
+      />
+      <div className="max-w-xl mx-auto grid gap-4" aria-busy={busy}>
+        {busy && <p role="status">Consultando sua reserva…</p>}
+        {error && (
+          <div className="rounded-xl border border-red-300 p-4 grid gap-3">
+            <p role="alert">{error}</p>
+            {location.hash.includes("reserva=") && (
+              <Button disabled={busy} onClick={retry}>
+                Consultar novamente
+              </Button>
+            )}
+          </div>
+        )}
+        {reservation && !busy ? (
+          <Card>
+            <ReservationAccess
+              key={reservation.token}
+              reservation={reservation}
+              onCancel={onCancel}
+              busy={busy}
+            />
+          </Card>
+        ) : (
+          !busy && (
+            <Card>
+              <form
+                className="grid gap-4"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void openLink(link);
+                }}
+              >
+                <label htmlFor="access-link" className="font-semibold text-sm">
+                  Link da sua reserva
+                </label>
+                <input
+                  id="access-link"
+                  type="url"
+                  required
+                  className={inputClass}
+                  value={link}
+                  onChange={(e) => setLink(e.target.value)}
+                  placeholder="Cole o link que você salvou"
+                />
+                <Button primary type="submit" disabled={busy}>
+                  Consultar reserva
+                </Button>
+              </form>
+            </Card>
+          )
+        )}
+        <p className="text-sm">
+          Perdeu o link? Entre em contato com a pizzaria. Nome, telefone e
+          código curto não liberam acesso à reserva.
+        </p>
+        {config.contactPhone && (
+          <a
+            className="inline-flex items-center min-h-12 underline"
+            href={"tel:" + config.contactPhone.replace(/[^+\d]/g, "")}
+          >
+            Ligar para a pizzaria
+          </a>
+        )}
+        {demoMode && (
+          <p className="text-sm">
+            Nesta demonstração, o link funciona somente neste navegador. Limpar
+            os dados apaga as reservas de teste.
+          </p>
+        )}
+      </div>
+    </>
+  );
 }

@@ -1,4 +1,5 @@
-export type ReservationStatus = "Confirmada" | "Presente" | "Concluída" | "Cancelada";
+export type ReservationStatus =
+  "Confirmada" | "Presente" | "Concluída" | "Cancelada";
 
 export type AreaPreference = "interna" | "externa" | "any";
 
@@ -11,8 +12,14 @@ export type BookingDraft = {
 };
 
 export type GuestContact = { name: string; phone: string };
-export type GuestReservation = BookingDraft & GuestContact & {
-  token: string;
-  code: string;
-  status: ReservationStatus;
-};
+export type GuestReservation = BookingDraft &
+  GuestContact & {
+    token: string;
+    code: string;
+    status: ReservationStatus;
+    tables?: number[];
+    cancellationReason?: string;
+    allowedActions?: ("cancel" | "arrive" | "complete" | "release")[];
+    delayMinutes?: number;
+    late?: boolean;
+  };

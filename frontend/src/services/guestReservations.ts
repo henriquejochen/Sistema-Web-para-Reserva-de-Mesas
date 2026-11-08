@@ -7,7 +7,7 @@ const prefix = "di-napoli:prototype:reservation:";
 export const RESERVATIONS_CHANGED = "di-napoli:prototype:reservations-changed";
 const tokenPattern = /^[a-f0-9]{64}$/;
 export const tokenFromHash = () => new URLSearchParams(window.location.hash.slice(1)).get("reserva") ?? "";
-export const reservationLink = (token: string) => window.location.href.split("#")[0] + "#reserva=" + token;
+export const reservationLink = (token: string) => window.location.origin + "/reserva#reserva=" + token;
 
 export function readReservation(token: string): GuestReservation | null {
   if (!tokenPattern.test(token)) return null;
@@ -75,7 +75,7 @@ export function releaseAbsentReservation(token: string, now = new Date()): Guest
 export function tokenFromLink(value: string): string {
   try {
     const url = new URL(value.trim());
-    if (url.origin !== location.origin || url.pathname !== location.pathname) return "";
+    if (url.origin !== location.origin || !["/", "/reserva", "/confirmacao"].includes(url.pathname)) return "";
     const token = new URLSearchParams(url.hash.slice(1)).get("reserva") ?? "";
     return tokenPattern.test(token) ? token : "";
   } catch { return ""; }

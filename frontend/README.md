@@ -1,5 +1,15 @@
 # Front-end
 
+## Atualização para aprovação — 08/11/2026
+
+Fluxo de reserva em duas etapas, gestão de mesas com cadastro/edição/inativação, filtros de reservas por status e chegada, navegação por URLs e suporte a Voltar/Avançar. Campos mantêm seus valores em falhas e entre as etapas. A interface exibe estados de requisição, respostas de conflito e permissões fornecidas pela API.
+
+Sem `VITE_API_BASE_URL`, o modo é demonstrativo e identificado. Mesas e reservas são locais; a sessão demonstrativa dura na aba. Com a variável configurada, usa HTTP sem fallback para demonstração. O backend ainda precisa ser implementado conforme [contrato proposto](../docs/contrato-api-frontend.md).
+
+`npm run build` compila; `npm run lint` verifica o código. Para testes de navegador: `npm ci`, `npx playwright install firefox webkit` e `npm run test:browser`. Chrome e Edge precisam estar instalados; Firefox e WebKit usam os motores do Playwright. A suíte inicia servidores nas portas 4173 e 4174 e usa dados fictícios/respostas de API simuladas. Testes reais com Django e aparelhos físicos continuam necessários.
+
+O registro abaixo descreve o protótipo original; onde houver diferença, valem esta atualização e o contrato proposto.
+
 Protótipo React + TypeScript + Vite da Pizzaria Di Napoli. Execute `npm ci` e `npm run dev`. Verifique a compilação com `npm run build`.
 
 ## Reserva por dia, sem conta

@@ -1,60 +1,308 @@
-import { useEffect, useState } from "react";
-import type { GuestReservation, ReservationStatus } from "../../types/reservation";
+import { useCallback, useEffect, useRef, useState } from "react";
+import type { GuestReservation } from "../../types/reservation";
+import { backend, ApiError, errorMessage } from "../../services/backend";
+import type { Configuration } from "../../services/backend";
 import { colors, inputClass, localDateISO } from "../../constants/theme";
-import { areaOptions } from "../../constants/tables";
+import { useResource } from "../../hooks/useResource";
 import { PageTitle } from "../../components/ui/PageTitle";
 import { Card } from "../../components/ui/Card";
 import { Button } from "../../components/ui/Button";
 import { StatusBadge } from "../../components/ui/StatusBadge";
-import { Icon } from "../../components/ui/Icon";
-import { usePrototypeReservations } from "../../hooks/usePrototypeReservations";
-import { releaseAbsentReservation, updateStaffReservation } from "../../services/guestReservations";
-import { ARRIVAL_GRACE_MINUTES, ARRIVAL_WARNING_MINUTES, arrivalDelayMinutes, canReleaseForAbsence } from "../../services/arrivalPolicy";
-
-export function DailyReservations() {
-  const { reservations, error } = usePrototypeReservations();
+import { RequestState } from "../../components/ui/RequestState";
+export function DailyReservations({ config }: { config: Configuration }) {
   const [date, setDate] = useState(localDateISO);
   const [search, setSearch] = useState("");
-  const [now, setNow] = useState(() => new Date());
-  const [pending, setPending] = useState<{token:string; absence:boolean} | null>(null);
+  const [status, setStatus] = useState("");
+  const [arrival, setArrival] = useState("");
+  const [page, setPage] = useState(1);
+  const load = useCallback(() => backend.reservations(date), [date]);
+  const resource = useResource(load);
+  const [pending, setPending] = useState<{
+    reservation: GuestReservation;
+    action: string;
+  } | null>(null);
+  const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
-  useEffect(() => {const timer = window.setInterval(() => setNow(new Date()), 30000); return () => window.clearInterval(timer);}, []);
-  const rows = reservations.filter(r => r.date === date && (r.name + " " + r.phone + " " + r.code).toLocaleLowerCase("pt-BR").includes(search.trim().toLocaleLowerCase("pt-BR")));
-  const update = (r: GuestReservation, status: ReservationStatus, absence = false) => {
+  const [error, setError] = useState("");
+  const lock = useRef(false);
+  useEffect(() => {
+    const timer = window.setInterval(resource.reload, 30000);
+    return () => window.clearInterval(timer);
+  }, [resource.reload]);
+  const rows = (resource.data ?? [])
+    .filter(
+      (r) =>
+        (!status || r.status === status) &&
+        (!arrival || r.arrivalTime === arrival) &&
+        (r.name + " " + r.phone + " " + r.code)
+          .toLocaleLowerCase("pt-BR")
+          .includes(search.trim().toLocaleLowerCase("pt-BR")),
+    )
+    .sort((a, b) => a.arrivalTime.localeCompare(b.arrivalTime));
+  const pages = Math.max(1, Math.ceil(rows.length / 10));
+  const currentPage = Math.min(page, pages);
+  const update = async (reservation: GuestReservation, action: string) => {
+    if (lock.current) return;
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    setMessage("");
     try {
-      const changed = absence ? releaseAbsentReservation(r.token) : updateStaffReservation(r.token, status);
-      setMessage(changed ? (absence ? "Reserva cancelada por ausência. A equipe pode realocar a mesa." : "Situação da reserva atualizada.") : "A ação não está mais disponível. Confira o status e a previsão de chegada.");
-    } catch {setMessage("Não foi possível salvar a alteração neste navegador.");}
-    setPending(null);
+      await backend.updateReservation(reservation.token, action);
+      setMessage("Situação da reserva atualizada.");
+      setPending(null);
+      resource.reload();
+    } catch (e) {
+      setError(errorMessage(e));
+      if (e instanceof ApiError && e.status === 401)
+        window.dispatchEvent(new Event("staff-session-expired"));
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
   };
-  return <>
-    <PageTitle title="Reservas do dia" subtitle="Acompanhe a previsão de chegada e confirme a presença de cada grupo."/>
-    <Card className="mb-4"><div className="grid gap-4 sm:grid-cols-2"><div><label htmlFor="staff-date" className="block text-sm mb-2 font-medium">Dia das reservas</label><input id="staff-date" type="date" className={inputClass} value={date} onChange={e=>{setDate(e.target.value);setPending(null);}}/></div><div><label htmlFor="staff-search" className="block text-sm mb-2 font-medium">Buscar cliente</label><input id="staff-search" type="search" className={inputClass} value={search} onChange={e=>setSearch(e.target.value)} placeholder="Nome, telefone ou código"/></div></div>
-      <div className="mt-4 flex flex-wrap gap-3 items-center text-sm"><span className="inline-flex items-center gap-2"><Icon name="clock" size={18}/>Agora: {now.toLocaleTimeString("pt-BR", {hour:"2-digit",minute:"2-digit"})}</span><span>{rows.length} {rows.length === 1 ? "reserva encontrada" : "reservas encontradas"}</span></div>
-      <p className="mt-3 text-xs" style={{color:colors.muted}}>Alerta após {ARRIVAL_WARNING_MINUTES} minutos. Após {ARRIVAL_GRACE_MINUTES} minutos de atraso, a equipe pode liberar a reserva por ausência. A ação exige confirmação; nada é cancelado automaticamente.</p>
-    </Card>
-    {error && <p role="alert" className="mb-4">{error}</p>}
-    <p role="status" className="mb-4 text-sm">{message}</p>
-    <div className="grid gap-4">
-      {rows.length === 0 && <Card><h2 className="font-semibold">Nenhuma reserva encontrada</h2><p className="mt-2 text-sm">Escolha outra data ou crie uma reserva de teste no site do cliente, usando este mesmo navegador e endereço.</p></Card>}
-      {rows.map(r => {
-        const delay = arrivalDelayMinutes(r, now);
-        const late = r.status === "Confirmada" && delay !== null && delay >= ARRIVAL_WARNING_MINUTES;
-        const releasable = canReleaseForAbsence(r, now);
-        return <Card key={r.token}>
-          <div className="flex flex-wrap gap-3 items-start justify-between"><div className="min-w-0"><h2 className="font-semibold break-words">{r.name}</h2><p className="mt-1 text-sm" style={{color:colors.muted}}>{r.guests} pessoas · {areaOptions.find(a=>a.value===r.area)?.label} · {r.code}</p></div><StatusBadge status={r.status}/></div>
-          <div className="mt-4 grid gap-2 sm:grid-cols-2 text-sm"><p className="flex items-center gap-2"><Icon name="clock" size={18}/><strong>Chegada: {r.arrivalTime || "não informada"}</strong></p><p>Contato: {r.phone}</p></div>
-          {r.note && <p className="mt-3 text-sm break-words">Observação: {r.note}</p>}
-          {late && <p className="mt-3 flex items-start gap-2 rounded-lg p-3 text-sm" style={{background:releasable?colors.redLight:"#FFF4DC",color:releasable?colors.redDark:colors.amber}}><Icon name="alert" size={18} className="shrink-0 mt-0.5"/>{delay} min de atraso. {releasable ? "A reserva pode ser liberada por ausência após confirmação da equipe." : "Verifique se o cliente avisou sobre o atraso."}</p>}
-          {pending?.token === r.token ? <div className="mt-4 grid gap-3 rounded-lg border p-4" style={{borderColor:colors.border}} role="group" aria-label="Confirmar cancelamento da reserva"><p className="text-sm">{pending.absence ? "O grupo ainda não chegou? Confirmar cancela a reserva por ausência e permite realocar a mesa." : "Deseja cancelar esta reserva?"}</p><div className="grid gap-2 sm:grid-cols-2"><Button danger onClick={()=>update(r,"Cancelada",pending.absence)}>Confirmar cancelamento</Button><Button onClick={()=>setPending(null)}>Manter reserva</Button></div></div> : <div className="mt-4 grid gap-2 sm:flex sm:flex-wrap">
-            {r.status === "Confirmada" && <Button primary onClick={()=>update(r,"Presente")}><Icon name="check" size={18}/>Confirmar chegada</Button>}
-            {r.status === "Presente" && <Button primary onClick={()=>update(r,"Concluída")}>Concluir atendimento</Button>}
-            {releasable && <Button danger onClick={()=>setPending({token:r.token,absence:true})}>Liberar por ausência</Button>}
-            {(r.status === "Confirmada" || r.status === "Presente") && <Button onClick={()=>setPending({token:r.token,absence:false})}>Cancelar reserva</Button>}
-          </div>}
-        </Card>;
-      })}
-    </div>
-    <p className="mt-5 text-xs" style={{color:colors.muted}}>Protótipo local: reservas deste navegador. A alocação física e os estados das mesas continuam demonstrativos.</p>
-  </>;
+  return (
+    <>
+      <PageTitle
+        title="Reservas do dia"
+        subtitle="Acompanhe as chegadas e a situação dos grupos."
+        action={
+          <Button onClick={resource.reload} disabled={busy || resource.loading}>
+            Atualizar lista
+          </Button>
+        }
+      />
+      <Card className="mb-4">
+        <fieldset disabled={busy} className="grid gap-4 sm:grid-cols-2 min-w-0">
+          <legend className="sr-only">Filtros de reservas</legend>
+          <div>
+            <label htmlFor="staff-date" className="block text-sm mb-2">
+              Dia das reservas
+            </label>
+            <input
+              id="staff-date"
+              type="date"
+              className={inputClass}
+              value={date}
+              onChange={(e) => {
+                if (e.target.value) {
+                  setDate(e.target.value);
+                  setPending(null);
+                  setPage(1);
+                }
+              }}
+            />
+          </div>
+          <div>
+            <label htmlFor="staff-search" className="block text-sm mb-2">
+              Buscar cliente
+            </label>
+            <input
+              id="staff-search"
+              type="search"
+              className={inputClass}
+              value={search}
+              onChange={(e) => {
+                setSearch(e.target.value);
+                setPage(1);
+              }}
+              placeholder="Nome, telefone ou código"
+            />
+          </div>
+          <div>
+            <label htmlFor="staff-status" className="block text-sm mb-2">
+              Status
+            </label>
+            <select
+              id="staff-status"
+              className={inputClass}
+              value={status}
+              onChange={(e) => {
+                setStatus(e.target.value);
+                setPage(1);
+              }}
+            >
+              <option value="">Todos</option>
+              {["Confirmada", "Presente", "Concluída", "Cancelada"].map((s) => (
+                <option key={s}>{s}</option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="staff-arrival" className="block text-sm mb-2">
+              Previsão de chegada
+            </label>
+            <input
+              id="staff-arrival"
+              type="time"
+              className={inputClass}
+              value={arrival}
+              onChange={(e) => {
+                setArrival(e.target.value);
+                setPage(1);
+              }}
+            />
+          </div>
+          <Button
+            onClick={() => {
+              setSearch("");
+              setStatus("");
+              setArrival("");
+              setPage(1);
+            }}
+          >
+            Limpar filtros
+          </Button>
+        </fieldset>
+        <p className="mt-4 text-sm">
+          Alerta após {config.warningMinutes} min; liberação por ausência após{" "}
+          {config.graceMinutes} min, mediante confirmação e autorização do
+          servidor.
+        </p>
+      </Card>
+      <RequestState
+        loading={resource.loading}
+        error={resource.error}
+        retry={resource.reload}
+      />
+      {error && (
+        <p role="alert" className="mb-4 text-red-800">
+          {error}
+        </p>
+      )}
+      <p role="status" className="mb-4 text-sm">
+        {message ||
+          (!resource.loading && !resource.error
+            ? `${rows.length} reserva(s) encontrada(s)`
+            : "")}
+      </p>
+      <div className="grid gap-4">
+        {!resource.loading && !resource.error && rows.length === 0 && (
+          <Card>
+            <h2 className="font-semibold">Nenhuma reserva encontrada</h2>
+            <p className="mt-2 text-sm">
+              Escolha outra data ou ajuste os filtros.
+            </p>
+          </Card>
+        )}
+        {rows.slice((currentPage - 1) * 10, currentPage * 10).map((r) => (
+          <Card key={r.token}>
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <h2 className="font-semibold break-words min-w-0">{r.name}</h2>
+              <StatusBadge status={r.status} />
+            </div>
+            <p className="mt-3 text-sm">
+              {r.guests} pessoas · Chegada: {r.arrivalTime || "não informada"}
+            </p>
+            <p className="mt-2 text-sm break-words">
+              {r.phone} · {r.code}
+              {r.tables?.length ? ` · Mesa(s): ${r.tables.join(", ")}` : ""}
+            </p>
+            {r.note && (
+              <p className="mt-3 text-sm break-words">Observação: {r.note}</p>
+            )}
+            {r.cancellationReason && (
+              <p className="mt-3 text-sm">Motivo: {r.cancellationReason}</p>
+            )}
+            {r.late && (
+              <p
+                className="mt-3 rounded-xl p-3 text-sm"
+                style={{ background: colors.redLight }}
+              >
+                {r.delayMinutes} min de atraso. Confira se o grupo avisou a
+                equipe.
+              </p>
+            )}
+            {pending?.reservation.token === r.token ? (
+              <div
+                className="mt-4 grid gap-3 rounded-xl border p-4"
+                role="group"
+                aria-label="Confirmar cancelamento"
+              >
+                <p className="text-sm">
+                  {pending.action === "release"
+                    ? "Confirmar ausência do grupo e liberar a reserva?"
+                    : "Deseja cancelar esta reserva?"}
+                </p>
+                <Button
+                  disabled={busy}
+                  danger
+                  onClick={() => update(r, pending.action)}
+                >
+                  {busy ? "Atualizando…" : "Confirmar cancelamento"}
+                </Button>
+                <Button disabled={busy} onClick={() => setPending(null)}>
+                  Manter reserva
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-3 sm:flex sm:flex-wrap">
+                {r.allowedActions?.includes("arrive") && (
+                  <Button
+                    disabled={busy}
+                    primary
+                    onClick={() => update(r, "arrive")}
+                  >
+                    Confirmar chegada
+                  </Button>
+                )}
+                {r.allowedActions?.includes("complete") && (
+                  <Button
+                    disabled={busy}
+                    primary
+                    onClick={() => update(r, "complete")}
+                  >
+                    Concluir atendimento
+                  </Button>
+                )}
+                {r.allowedActions?.includes("release") && (
+                  <Button
+                    disabled={busy}
+                    danger
+                    onClick={() =>
+                      setPending({ reservation: r, action: "release" })
+                    }
+                  >
+                    Liberar por ausência
+                  </Button>
+                )}
+                {r.allowedActions?.includes("cancel") && (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      setPending({ reservation: r, action: "cancel" })
+                    }
+                  >
+                    Cancelar reserva
+                  </Button>
+                )}
+              </div>
+            )}
+          </Card>
+        ))}
+      </div>
+      {pages > 1 && (
+        <nav
+          aria-label="Páginas de reservas"
+          className="mt-5 flex flex-wrap gap-3 items-center"
+        >
+          <Button
+            disabled={currentPage === 1}
+            onClick={() => setPage(currentPage - 1)}
+          >
+            Anterior
+          </Button>
+          <span className="text-sm">
+            Página {currentPage} de {pages}
+          </span>
+          <Button
+            disabled={currentPage === pages}
+            onClick={() => setPage(currentPage + 1)}
+          >
+            Próxima
+          </Button>
+        </nav>
+      )}
+    </>
+  );
 }
