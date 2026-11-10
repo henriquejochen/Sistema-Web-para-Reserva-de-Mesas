@@ -1,7 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { Screen, Role, NavigationItem } from "./types/navigation";
-import type { BookingDraft, GuestContact, GuestReservation } from "./types/reservation";
-import { defaultBooking, localDateISO } from "./constants/theme";
+import type {
+  BookingDraft,
+  GuestContact,
+  GuestReservation,
+} from "./types/reservation";
+import { defaultBooking } from "./constants/theme";
 import { MainLayout } from "./layouts/MainLayout";
 import { Login } from "./screens/auth/Login";
 import { ClientHome } from "./screens/client/ClientHome";
@@ -11,8 +15,10 @@ import { MyReservations } from "./screens/client/MyReservations";
 import { AdminHome } from "./screens/admin/AdminHome";
 import { DailyReservations } from "./screens/admin/DailyReservations";
 import { TablesManagement } from "./screens/admin/TablesManagement";
-import { cancelReservation, createReservation, readReservation, tokenFromHash, tokenFromLink } from "./services/guestReservations";
-import { isArrivalWithinOpeningHours, MIN_ARRIVAL_TIME, MAX_ARRIVAL_TIME, arrivalDelayMinutes } from "./services/arrivalPolicy";
+import { tokenFromHash, tokenFromLink } from "./services/guestReservations";
+import { ApiError, backend, demoMode, errorMessage } from "./services/backend";
+import type { Configuration, FieldErrors } from "./services/backend";
+import { RequestState } from "./components/ui/RequestState";
 
 const navigation: NavigationItem[] = [
   { screen: "client", label: "Início", role: "client" },
@@ -22,104 +28,330 @@ const navigation: NavigationItem[] = [
   { screen: "daily", label: "Reservas do dia", role: "admin" },
   { screen: "tables", label: "Mesas", role: "admin" },
 ];
-const isTeamPath = () => /^\/equipe\/?$/.test(location.pathname);
-const adminScreens: Screen[] = ["admin", "daily", "tables"];
-
+const paths: Partial<Record<Screen, string>> = {
+  client: "/",
+  reserve: "/reservar",
+  "my-reservations": "/reserva",
+  confirmation: "/confirmacao",
+  admin: "/equipe",
+  daily: "/equipe/reservas",
+  tables: "/equipe/mesas",
+  login: "/equipe/login",
+};
+const teamScreens: Screen[] = ["admin", "daily", "tables"];
+function route(): Screen {
+  const path = location.pathname.replace(/\/$/, "") || "/";
+  return (
+    (Object.entries(paths).find(
+      ([, value]) => value === path,
+    )?.[0] as Screen) ?? (tokenFromHash() ? "my-reservations" : "client")
+  );
+}
 export default function App() {
-  const [screen, setScreen] = useState<Screen>(() => isTeamPath() ? "login" : tokenFromHash() ? "my-reservations" : "client");
-  const [staffAuthenticated, setStaffAuthenticated] = useState(false);
-  const [booking, setBooking] = useState<BookingDraft>(defaultBooking);
-  const [contact, setContact] = useState<GuestContact>({name: "", phone: ""});
+  const [screen, setScreen] = useState<Screen>(() =>
+    tokenFromHash() && location.pathname === "/" ? "my-reservations" : route(),
+  );
+  const [session, setSession] = useState<boolean | null>(null);
+  const [config, setConfig] = useState<Configuration | null>(null);
+  const [setupError, setSetupError] = useState("");
+  const [setupAttempt, setSetupAttempt] = useState(0);
+  const [booking, setBooking] = useState<BookingDraft>({ ...defaultBooking });
+  const [contact, setContact] = useState<GuestContact>({ name: "", phone: "" });
+  const [reservation, setReservation] = useState<GuestReservation | null>(null);
   const [token, setToken] = useState(tokenFromHash);
-  const [reservation, setReservation] = useState<GuestReservation | null>(() => readReservation(tokenFromHash()));
+  const [readAttempt, setReadAttempt] = useState(0);
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [fields, setFields] = useState<FieldErrors>({});
+  const requestId = useRef(crypto.randomUUID());
+  const actionLock = useRef(false);
 
   useEffect(() => {
-    const sync = () => {
-      const current = tokenFromHash();
-      setToken(current); setReservation(readReservation(current)); setError("");
-      setStaffAuthenticated(false);
-      setScreen(isTeamPath() ? "login" : current ? "my-reservations" : "client");
+    let active = true;
+    Promise.all([backend.configuration(), backend.session()])
+      .then(([configuration, staff]) => {
+        if (active) {
+          setConfig(configuration);
+          setSession(staff.authenticated);
+        }
+      })
+      .catch((e) => {
+        if (active) setSetupError(errorMessage(e));
+      });
+    return () => {
+      active = false;
     };
-    window.addEventListener("hashchange", sync);
-    const syncStorage = (event: StorageEvent) => {
-      if (!isTeamPath() && (event.key === null || event.key === "di-napoli:prototype:reservation:" + tokenFromHash())) {
-        setReservation(readReservation(tokenFromHash()));
-      }
+  }, [setupAttempt]);
+  useEffect(() => {
+    const sync = () => {
+      setScreen(
+        tokenFromHash() && location.pathname === "/"
+          ? "my-reservations"
+          : route(),
+      );
+      setToken(tokenFromHash());
+      setReadAttempt((v) => v + 1);
+      setError("");
+      setReservation(null);
+    };
+    const expire = () => {
+      setSession(false);
+      setError("Sua sessão expirou. Entre novamente.");
     };
     window.addEventListener("popstate", sync);
-    window.addEventListener("storage", syncStorage);
-    return () => {window.removeEventListener("hashchange", sync); window.removeEventListener("popstate", sync); window.removeEventListener("storage", syncStorage);};
+    window.addEventListener("hashchange", sync);
+    window.addEventListener("staff-session-expired", expire);
+    return () => {
+      window.removeEventListener("popstate", sync);
+      window.removeEventListener("hashchange", sync);
+      window.removeEventListener("staff-session-expired", expire);
+    };
   }, []);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      window.scrollTo(0, 0);
+      const heading = document.querySelector<HTMLElement>("h1, h2");
+      if (heading) {
+        heading.tabIndex = -1;
+        heading.focus({ preventScroll: true });
+      }
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [screen, session]);
+  useEffect(() => {
+    if (!token || !["confirmation", "my-reservations"].includes(screen)) return;
+    let active = true;
+    void Promise.resolve().then(() => {
+      if (active) {
+        setBusy(true);
+        setError("");
+      }
+    });
+    backend
+      .read(token)
+      .then((r) => {
+        if (active) setReservation(r);
+      })
+      .catch((e) => {
+        if (active) setError(errorMessage(e));
+      })
+      .finally(() => {
+        if (active) setBusy(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [token, screen, readAttempt]);
 
-  const go = (next: Screen) => {
-    if (adminScreens.includes(next) && (!isTeamPath() || !staffAuthenticated)) {
-      setScreen(isTeamPath() ? "login" : "client"); return;
-    }
-    setError("");
-    if (next !== "confirmation" && next !== "my-reservations") {
-      history.replaceState(null, "", location.pathname + location.search);
-      setToken(""); setReservation(null);
-    }
-    if (isTeamPath() && !adminScreens.includes(next) && next !== "login") {
-      history.pushState(null, "", "/"); setStaffAuthenticated(false);
-    }
-    if (next === "reserve") {setBooking({...defaultBooking, date: localDateISO()}); setContact({name: "", phone: ""});}
+  const go = (next: Screen, accessToken = "") => {
+    const keepToken =
+      accessToken ||
+      (["confirmation", "my-reservations"].includes(next) ? token : "");
+    history.pushState(
+      null,
+      "",
+      (paths[next] ?? "/") +
+        (keepToken ? "#reserva=" + encodeURIComponent(keepToken) : ""),
+    );
+    setToken(keepToken);
     setScreen(next);
+    setError("");
+    setFields({});
+    if (!keepToken) setReservation(null);
   };
-  const login = (username: string, password: string) => {
-    if (!isTeamPath() || username.trim() !== "equipe" || password !== "napoli-demo") return false;
-    setStaffAuthenticated(true); setScreen("admin"); return true;
+  const handleError = (e: unknown) => {
+    setError(errorMessage(e));
+    setFields(e instanceof ApiError ? e.fields : {});
+    if (e instanceof ApiError && e.status === 401) setSession(false);
   };
-  const openLink = (link: string) => {
+  const confirm = async () => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setBusy(true);
+    setError("");
+    setFields({});
+    try {
+      const created = await backend.create(booking, contact, requestId.current);
+      setReservation(created);
+      go("confirmation", created.token);
+      setBooking({ ...defaultBooking });
+      setContact({ name: "", phone: "" });
+      requestId.current = crypto.randomUUID();
+    } catch (e) {
+      handleError(e);
+    } finally {
+      actionLock.current = false;
+      setBusy(false);
+    }
+  };
+  const cancel = async () => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      setReservation(await backend.cancel(token));
+    } catch (e) {
+      handleError(e);
+    } finally {
+      actionLock.current = false;
+      setBusy(false);
+    }
+  };
+  const openLink = async (link: string) => {
     const current = tokenFromLink(link);
-    const found = readReservation(current);
-    if (!found) return false;
-    history.replaceState(null, "", "#reserva=" + current);
-    setToken(current); setReservation(found); setError("");
-    return true;
-  };
-  const confirm = () => {
-    if (!isArrivalWithinOpeningHours(booking.arrivalTime)) {
-      setError(`Informe a previsão de chegada entre ${MIN_ARRIVAL_TIME} e ${MAX_ARRIVAL_TIME}.`); return;
+    if (!current) {
+      setError("Cole um link de reserva válido deste site.");
+      return;
     }
-    if (contact.name.trim().length < 2 || !/^\d{10,11}$/.test(contact.phone.replace(/\D/g, "")) ||
-      !/^\d{4}-\d{2}-\d{2}$/.test(booking.date) || !Number.isFinite(new Date(booking.date + "T12:00:00").getTime()) ||
-      booking.date < localDateISO() || !Number.isInteger(booking.guests) || booking.guests < 1 || booking.guests > 12 ||
-      (arrivalDelayMinutes(booking) ?? 0) > 0) {
-      setError("Confira nome, telefone com DDD, quantidade de pessoas, data e previsão de chegada. A chegada não pode estar no passado."); return;
+    go("my-reservations", current);
+    setReadAttempt((v) => v + 1);
+  };
+  const login = async (username: string, password: string) => {
+    const result = await backend.login(username, password);
+    if (!result.authenticated)
+      throw new ApiError("Não foi possível iniciar a sessão.");
+    setSession(true);
+    setError("");
+    if (!teamScreens.includes(screen)) go("admin");
+  };
+  const logout = async () => {
+    if (actionLock.current) return;
+    actionLock.current = true;
+    setBusy(true);
+    try {
+      await backend.logout();
+      setSession(false);
+      go("login");
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setBusy(false);
+      actionLock.current = false;
     }
-    try {
-      const created = createReservation(booking, contact);
-      history.replaceState(null, "", "#reserva=" + created.token);
-      setToken(created.token); setReservation(created); setScreen("confirmation"); setError("");
-      setBooking({...defaultBooking}); setContact({name: "", phone: ""});
-    } catch {setError("Não foi possível salvar o teste neste navegador. Libere o armazenamento local e tente novamente.");}
   };
-  const cancel = () => {
+  const retryRead = async () => {
+    setBusy(true);
+    setError("");
     try {
-      const cancelled = cancelReservation(token);
-      if (!cancelled) {setError("Esta reserva não está disponível para cancelamento."); setReservation(readReservation(token)); return;}
-      setReservation(cancelled); setError("");
-    } catch {setError("Não foi possível salvar o cancelamento. Tente novamente.");}
+      setReservation(await backend.read(token));
+    } catch (e) {
+      handleError(e);
+    } finally {
+      setBusy(false);
+    }
   };
-
-  const isPublic = screen === "login";
-  const role: Role = ["admin", "daily", "tables"].includes(screen) ? "admin" : "client";
-  const currentLabel = screen === "confirmation" ? "Reserva confirmada" : navigation.find(n => n.screen === screen)?.label ?? "";
+  const needsLogin = teamScreens.includes(screen) && session === false;
+  const role: Role = teamScreens.includes(screen) ? "admin" : "client";
+  const isPublic = screen === "login" || needsLogin;
   let content;
-  switch (screen) {
-    case "login": content = <Login go={go} onLogin={login}/>; break;
-    case "reserve": content = <Reserve go={go} booking={booking} setBooking={setBooking} contact={contact} setContact={setContact} onConfirm={confirm} error={error}/>; break;
-    case "confirmation": content = reservation ? <Confirmation go={go} reservation={reservation}/> : <ClientHome go={go}/>; break;
-    case "my-reservations": content = <MyReservations go={go} reservation={reservation} invalidLink={!!token && !reservation} openLink={openLink} onCancel={cancel} error={error}/>; break;
-    case "admin": content = <AdminHome go={go}/>; break;
-    case "daily": content = <DailyReservations/>; break;
-    case "tables": content = <TablesManagement/>; break;
-    default: content = <ClientHome go={go}/>;
-  }
-  return <MainLayout screen={screen} role={role} isPublic={isPublic} currentLabel={currentLabel}
-    visibleNav={navigation.filter(n => n.role === role)} onNavigate={go} onLogout={() => {setStaffAuthenticated(false); setScreen("login");}}>
-    {content}
-  </MainLayout>;
+  if (!config || session === null)
+    content = (
+      <RequestState
+        loading={!setupError}
+        error={setupError}
+        retry={() => {
+          setSetupError("");
+          setSetupAttempt((v) => v + 1);
+        }}
+      />
+    );
+  else if (isPublic)
+    content = (
+      <Login go={go} onLogin={login} notice={needsLogin ? error : ""} />
+    );
+  else
+    switch (screen) {
+      case "reserve":
+        content = (
+          <Reserve
+            go={go}
+            booking={booking}
+            setBooking={(b) => {
+              setBooking(b);
+              requestId.current = crypto.randomUUID();
+            }}
+            contact={contact}
+            setContact={(c) => {
+              setContact(c);
+              requestId.current = crypto.randomUUID();
+            }}
+            onConfirm={confirm}
+            error={error}
+            fields={fields}
+            busy={busy}
+            config={config}
+          />
+        );
+        break;
+      case "confirmation":
+        content =
+          reservation && !busy && !error ? (
+            <Confirmation go={go} reservation={reservation} />
+          ) : (
+            <MyReservations
+              go={go}
+              reservation={reservation}
+              openLink={openLink}
+              onCancel={cancel}
+              busy={busy}
+              error={error}
+              retry={retryRead}
+              config={config}
+            />
+          );
+        break;
+      case "my-reservations":
+        content = (
+          <MyReservations
+            go={go}
+            reservation={reservation}
+            openLink={openLink}
+            onCancel={cancel}
+            busy={busy}
+            error={error}
+            retry={retryRead}
+            config={config}
+          />
+        );
+        break;
+      case "admin":
+        content = <AdminHome go={go} />;
+        break;
+      case "daily":
+        content = <DailyReservations config={config} />;
+        break;
+      case "tables":
+        content = <TablesManagement />;
+        break;
+      default:
+        content = <ClientHome go={go} />;
+    }
+  return (
+    <MainLayout
+      screen={screen}
+      role={role}
+      isPublic={isPublic}
+      currentLabel={
+        navigation.find((n) => n.screen === screen)?.label ?? "Reserva"
+      }
+      visibleNav={navigation.filter((n) => n.role === role)}
+      onNavigate={go}
+      onLogout={logout}
+      busy={busy}
+    >
+      {demoMode && (
+        <p className="demo-notice mb-4 rounded-xl border p-3 text-sm">
+          Demonstração local. Use dados fictícios; nenhuma reserva é enviada à
+          pizzaria.
+        </p>
+      )}
+      {!isPublic && error && teamScreens.includes(screen) && (
+        <p role="alert" className="mb-4">
+          {error}
+        </p>
+      )}
+      {content}
+    </MainLayout>
+  );
 }

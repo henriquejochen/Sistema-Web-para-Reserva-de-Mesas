@@ -26,11 +26,17 @@ export function AreaSelector({ value, onChange }: AreaSelectorProps) {
               color: active ? colors.redDark : colors.muted,
             }}
           >
-            <Icon name={opt.icon}/>
-            <span className="text-xs font-semibold" style={{ color: active ? colors.redDark : colors.ink }}>
+            <Icon name={opt.icon} />
+            <span
+              className="text-sm font-semibold"
+              style={{ color: active ? colors.redDark : colors.ink }}
+            >
               {opt.label}
             </span>
-            <span className="text-[10px] leading-tight" style={{ color: colors.muted }}>
+            <span
+              className="hidden sm:block text-sm leading-snug"
+              style={{ color: colors.muted }}
+            >
               {opt.desc}
             </span>
           </button>

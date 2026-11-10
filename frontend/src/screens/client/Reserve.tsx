@@ -1,3 +1,4 @@
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Screen } from "../../types/navigation";
 import type { BookingDraft, GuestContact } from "../../types/reservation";
 import { colors, inputClass, localDateISO } from "../../constants/theme";
@@ -8,38 +9,344 @@ import { Button } from "../../components/ui/Button";
 import { GuestDropdown } from "../../components/reservation/GuestDropdown";
 import { AreaSelector } from "../../components/reservation/AreaSelector";
 import { BookingSummary } from "../../components/reservation/BookingSummary";
-import { Icon } from "../../components/ui/Icon";
-import { ARRIVAL_GRACE_MINUTES, MIN_ARRIVAL_TIME, MAX_ARRIVAL_TIME } from "../../services/arrivalPolicy";
+import { backend, demoMode } from "../../services/backend";
+import type { Configuration, FieldErrors } from "../../services/backend";
+import { useResource } from "../../hooks/useResource";
+import { RequestState } from "../../components/ui/RequestState";
 
 interface ReserveProps {
-  go: (s: Screen) => void; booking: BookingDraft; setBooking: (b: BookingDraft) => void;
-  contact: GuestContact; setContact: (c: GuestContact) => void; onConfirm: () => void; error: string;
+  go: (s: Screen) => void;
+  booking: BookingDraft;
+  setBooking: (b: BookingDraft) => void;
+  contact: GuestContact;
+  setContact: (c: GuestContact) => void;
+  onConfirm: () => Promise<void>;
+  error: string;
+  fields: FieldErrors;
+  busy: boolean;
+  config: Configuration;
 }
-export function Reserve({go, booking, setBooking, contact, setContact, onConfirm, error}: ReserveProps) {
-  const date = new Date(booking.date + "T12:00:00");
-  const rodizio = [3,4,5,6].includes(date.getDay());
-  return <>
-    <PageTitle title="Reserve sua mesa" subtitle="Reserve pelo dia e informe a previsão de chegada para organizarmos sua recepção."/>
-    <form onSubmit={e=>{e.preventDefault(); onConfirm();}} className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
-      <div className="grid gap-4 min-w-0">
-        <Card><h2 className="flex items-center gap-2 mb-4 font-semibold"><Icon name="calendar"/>Qual dia e quantas pessoas?</h2>
-          <div className="grid gap-4 sm:grid-cols-2"><Field label="Dia da reserva"><input type="date" className={inputClass} min={localDateISO()} required value={booking.date} onChange={e=>setBooking({...booking,date:e.target.value})}/></Field><Field label="Número de pessoas"><GuestDropdown value={booking.guests} onChange={guests=>setBooking({...booking,guests})}/></Field></div>
-          <p className="mt-4 text-sm" style={{color: colors.muted}}>Abrimos todos os dias. Rodízio de quarta a sábado.</p>
-          {booking.date && <p className="mt-2 text-sm font-medium" style={{color:colors.redDark}}>{rodizio ? "Neste dia também temos rodízio." : "Neste dia o atendimento é à la carte, sem rodízio."}</p>}
-        </Card>
-        <Card><h2 className="flex items-center gap-2 mb-4 font-semibold"><Icon name="clock"/>A que horas pretende chegar?</h2>
-          <label htmlFor="arrival-time" className="block mb-2 text-sm font-medium">Previsão de chegada</label>
-          <input id="arrival-time" type="time" required min={MIN_ARRIVAL_TIME} max={MAX_ARRIVAL_TIME} step={60} className={inputClass} value={booking.arrivalTime} onChange={e=>setBooking({...booking,arrivalTime:e.target.value})} aria-describedby="arrival-help arrival-policy"/>
-          <p id="arrival-help" className="mt-3 text-sm" style={{color:colors.muted}}>Informe a chegada entre {MIN_ARRIVAL_TIME} e {MAX_ARRIVAL_TIME}. Este horário serve para a equipe saber quando esperar seu grupo. Sua reserva é por dia, sem divisão em faixas de horário.</p>
-          <p id="arrival-policy" className="mt-3 rounded-lg p-3 text-sm" style={{background:colors.cream}}>Após {ARRIVAL_GRACE_MINUTES} minutos de atraso, a equipe poderá cancelar a reserva por ausência e disponibilizar a mesa para outro grupo. Se precisar chegar mais tarde, entre em contato com a pizzaria.</p>
-        </Card>
-        <Card><h2 className="mb-2 font-semibold">Onde prefere sentar?</h2><p className="mb-4 text-sm" style={{color:colors.muted}}>Vamos organizar as mesas de acordo com o tamanho do grupo.</p><AreaSelector value={booking.area} onChange={area=>setBooking({...booking,area})}/></Card>
-        <Card><Field label="Observação" hint="opcional"><textarea className={inputClass} rows={3} maxLength={500} placeholder="Cadeira de bebê, acessibilidade ou algo que precisamos saber" value={booking.note} onChange={e=>setBooking({...booking,note:e.target.value})}/></Field></Card>
-        <Card><h2 className="mb-2 font-semibold">Seus dados para finalizar</h2><p className="mb-4 text-sm" style={{color:colors.muted}}>Só precisamos do seu nome e de um telefone para contato. Sem cadastro ou senha.</p>
-          <div className="grid gap-4 sm:grid-cols-2"><div><label htmlFor="guest-name" className="block mb-2 text-sm font-medium">Nome</label><input id="guest-name" required minLength={2} maxLength={80} autoComplete="name" className={inputClass} value={contact.name} onChange={e=>setContact({...contact,name:e.target.value})}/></div><div><label htmlFor="guest-phone" className="block mb-2 text-sm font-medium">Telefone com DDD</label><input id="guest-phone" type="tel" inputMode="tel" required maxLength={20} autoComplete="tel-national" placeholder="(48) 99999-0000" className={inputClass} aria-describedby="phone-help" value={contact.phone} onChange={e=>setContact({...contact,phone:e.target.value})}/><p id="phone-help" className="mt-2 text-xs">10 ou 11 dígitos, incluindo o DDD. Não enviamos códigos.</p></div></div>
-        </Card>
-      </div>
-      <div className="min-w-0 self-start grid gap-4 lg:sticky lg:top-5"><Card><h2 className="font-semibold mb-4">Confira sua reserva</h2><BookingSummary booking={booking}/><p className="my-4 text-sm">Após confirmar, salve o link exclusivo para consultar ou cancelar esta reserva.</p>{error && <p role="alert" className="mb-4 text-sm" style={{color:colors.redDark}}>{error}</p>}<div className="grid gap-2"><Button primary full type="submit">Confirmar reserva <Icon name="arrow" size={18}/></Button><Button full onClick={()=>go("client")}>Voltar ao início</Button></div></Card><p className="text-xs px-1" style={{color:colors.muted}}>Protótipo: use dados fictícios. Nenhuma reserva é enviada à pizzaria.</p></div>
-    </form>
-  </>;
+export function Reserve({
+  go,
+  booking,
+  setBooking,
+  contact,
+  setContact,
+  onConfirm,
+  error,
+  fields,
+  busy,
+  config,
+}: ReserveProps) {
+  const [step, setStep] = useState(1);
+  const heading = useRef<HTMLHeadingElement>(null);
+  const form = useRef<HTMLFormElement>(null);
+  const { date, guests, area } = booking;
+  const loadAvailability = useCallback(
+    () => backend.availability({ date, guests, area }),
+    [date, guests, area],
+  );
+  const availability = useResource(loadAvailability);
+  useEffect(() => {
+    if (!error) return;
+    const frame = requestAnimationFrame(() => {
+      if (["date", "guests", "area", "arrivalTime"].some((key) => fields[key]))
+        setStep(1);
+      requestAnimationFrame(() => {
+        const key = Object.keys(fields)[0];
+        const control = key
+          ? form.current?.querySelector<HTMLElement>(
+              `[name="${CSS.escape(key)}"]`,
+            )
+          : document.getElementById("booking-error");
+        control?.focus();
+        control?.scrollIntoView({ block: "center", behavior: "smooth" });
+      });
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [error, fields]);
+  const moveStep = (value: number) => {
+    setStep(value);
+    requestAnimationFrame(() => {
+      heading.current?.focus();
+      window.scrollTo(0, 0);
+    });
+  };
+  const fieldError = (key: string) =>
+    fields[key] ? (
+      <p id={key + "-error"} className="text-sm mt-2 text-red-800" role="alert">
+        {fields[key]}
+      </p>
+    ) : null;
+  const unavailable = availability.data?.available === false;
+  return (
+    <>
+      <PageTitle
+        title="Reserve sua mesa"
+        subtitle="Sem conta ou senha. Sua mesa em dois passos."
+      />
+      <ol
+        className="mb-5 grid grid-cols-2 gap-2 text-sm"
+        aria-label="Etapas da reserva"
+      >
+        {["Sua reserva", "Dados e confirmação"].map((label, index) => (
+          <li
+            key={label}
+            aria-current={step === index + 1 ? "step" : undefined}
+            className="rounded-xl border p-3"
+            style={{
+              background: step === index + 1 ? colors.redLight : "white",
+              borderColor: colors.border,
+            }}
+          >
+            <span className="font-semibold">{index + 1}.</span> {label}
+          </li>
+        ))}
+      </ol>
+      <form
+        ref={form}
+        aria-busy={busy}
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (step === 1) moveStep(2);
+          else void onConfirm();
+        }}
+        className="mx-auto max-w-3xl grid gap-4"
+      >
+        <h2 ref={heading} tabIndex={-1} className="text-xl font-semibold">
+          {step === 1 ? "Quando será sua visita?" : "Confira e confirme"}
+        </h2>
+        {error && (
+          <div
+            id="booking-error"
+            tabIndex={-1}
+            role="alert"
+            className="rounded-xl border border-red-300 bg-red-50 p-4 text-sm"
+          >
+            <p>{error}</p>
+            <p className="mt-2">
+              Seus dados foram mantidos. Se a confirmação ficou incerta,
+              consulte sua reserva ou contate a pizzaria antes de repetir.
+            </p>
+          </div>
+        )}
+        {step === 1 ? (
+          <fieldset disabled={busy} className="grid gap-4 min-w-0">
+            <legend className="sr-only">Dados da visita</legend>
+            <Card>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Dia da reserva">
+                  <input
+                    name="date"
+                    type="date"
+                    required
+                    className={inputClass}
+                    min={localDateISO()}
+                    value={booking.date}
+                    aria-invalid={!!fields.date}
+                    aria-describedby={fields.date ? "date-error" : undefined}
+                    onChange={(e) =>
+                      setBooking({ ...booking, date: e.target.value })
+                    }
+                  />
+                  {fieldError("date")}
+                </Field>
+                <Field label="Número de pessoas">
+                  <GuestDropdown
+                    max={config.maxGuests}
+                    value={booking.guests}
+                    onChange={(guests) => setBooking({ ...booking, guests })}
+                  />
+                  {fieldError("guests")}
+                </Field>
+                <Field label="Previsão de chegada">
+                  <input
+                    name="arrivalTime"
+                    type="time"
+                    required
+                    min={config.minArrival}
+                    max={config.maxArrival}
+                    className={inputClass}
+                    value={booking.arrivalTime}
+                    aria-invalid={!!fields.arrivalTime}
+                    aria-describedby="arrival-hint arrivalTime-error"
+                    onChange={(e) =>
+                      setBooking({ ...booking, arrivalTime: e.target.value })
+                    }
+                  />
+                  <span id="arrival-hint" className="text-sm font-normal">
+                    Entre {config.minArrival} e {config.maxArrival}.
+                  </span>
+                  {fieldError("arrivalTime")}
+                </Field>
+              </div>
+              <details className="mt-4 text-sm">
+                <summary className="min-h-12 flex items-center cursor-pointer font-medium">
+                  Funcionamento e política de atraso
+                </summary>
+                <p>
+                  A reserva é por dia. O horário informa à equipe quando esperar
+                  seu grupo. Rodízio de quarta a sábado.
+                </p>
+                <p className="mt-2">
+                  Após {config.graceMinutes} minutos de atraso, a equipe poderá
+                  cancelar por ausência. Se precisar chegar mais tarde, contate
+                  a pizzaria.
+                </p>
+              </details>
+            </Card>
+            <Card>
+              <h3 className="font-semibold mb-3">Onde prefere sentar?</h3>
+              <AreaSelector
+                value={booking.area}
+                onChange={(area) => setBooking({ ...booking, area })}
+              />
+              {fieldError("area")}
+            </Card>
+            <Card>
+              <RequestState
+                loading={availability.loading}
+                error={availability.error}
+                retry={availability.reload}
+              />
+              {availability.data && (
+                <div className="text-sm" role="status">
+                  <p>{availability.data.message}</p>
+                  {availability.data.alternatives.length > 0 && (
+                    <ul className="list-disc pl-5 mt-2">
+                      {availability.data.alternatives.map((a) => (
+                        <li key={a}>{a}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+              <div className="mt-3">
+                <Button
+                  onClick={availability.reload}
+                  disabled={availability.loading}
+                >
+                  Atualizar disponibilidade
+                </Button>
+              </div>
+            </Card>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Button onClick={() => go("client")}>Voltar ao início</Button>
+              <Button
+                primary
+                type="submit"
+                disabled={
+                  availability.loading || !!availability.error || unavailable
+                }
+              >
+                Continuar para seus dados
+              </Button>
+            </div>
+          </fieldset>
+        ) : (
+          <>
+            <Card>
+              <BookingSummary booking={booking} />
+              <div className="mt-4">
+                <Button onClick={() => moveStep(1)} disabled={busy}>
+                  Alterar visita
+                </Button>
+              </div>
+            </Card>
+            <fieldset disabled={busy} className="min-w-0">
+              <legend className="sr-only">Dados para contato</legend>
+              <Card>
+                <div className="grid gap-4">
+                  <Field label="Nome">
+                    <input
+                      name="name"
+                      required
+                      minLength={2}
+                      maxLength={80}
+                      autoComplete="name"
+                      className={inputClass}
+                      value={contact.name}
+                      aria-invalid={!!fields.name}
+                      aria-describedby={fields.name ? "name-error" : undefined}
+                      onChange={(e) =>
+                        setContact({ ...contact, name: e.target.value })
+                      }
+                    />
+                    {fieldError("name")}
+                  </Field>
+                  <Field label="Telefone com DDD">
+                    <input
+                      name="phone"
+                      type="tel"
+                      inputMode="tel"
+                      required
+                      maxLength={20}
+                      autoComplete="tel-national"
+                      placeholder="(48) 99999-0000"
+                      className={inputClass}
+                      value={contact.phone}
+                      aria-invalid={!!fields.phone}
+                      aria-describedby="phone-hint phone-error"
+                      onChange={(e) =>
+                        setContact({ ...contact, phone: e.target.value })
+                      }
+                    />
+                    <span id="phone-hint" className="text-sm font-normal">
+                      Telefone para contato sobre a reserva. Não enviamos
+                      códigos.
+                    </span>
+                    {fieldError("phone")}
+                  </Field>
+                  <Field label="Observação" hint="opcional">
+                    <textarea
+                      name="note"
+                      rows={2}
+                      maxLength={500}
+                      className={inputClass}
+                      placeholder="Acessibilidade, cadeira de bebê…"
+                      value={booking.note}
+                      onChange={(e) =>
+                        setBooking({ ...booking, note: e.target.value })
+                      }
+                    />
+                    {fieldError("note")}
+                  </Field>
+                  <p className="text-sm" style={{ color: colors.muted }}>
+                    Nome e telefone serão usados para organizar e entrar em
+                    contato sobre sua reserva. Guarde o link exclusivo exibido
+                    após confirmar.
+                  </p>
+                </div>
+              </Card>
+            </fieldset>
+            <Card>
+              <p className="text-sm mb-4">
+                Confira os dados acima antes de confirmar.
+                {demoMode
+                  ? " Esta é uma simulação local."
+                  : " A confirmação depende da disponibilidade no servidor."}
+              </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Button onClick={() => moveStep(1)} disabled={busy}>
+                  Voltar
+                </Button>
+                <Button
+                  primary
+                  type="submit"
+                  disabled={
+                    busy ||
+                    availability.loading ||
+                    !!availability.error ||
+                    unavailable
+                  }
+                >
+                  {busy ? "Confirmando…" : "Confirmar reserva"}
+                </Button>
+              </div>
+            </Card>
+          </>
+        )}
+      </form>
+    </>
+  );
 }
