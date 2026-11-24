@@ -1,14 +1,31 @@
-from datetime import datetime
-from django.db.models import Count,Q
+import re
+from django.contrib.auth import authenticate,login,logout
+from django.middleware.csrf import get_token
 from django.utils import timezone
 from rest_framework import generics,status
-from rest_framework.decorators import api_view,permission_classes
+from rest_framework.authentication import SessionAuthentication
+from rest_framework.decorators import api_view,permission_classes,throttle_classes
+from rest_framework.exceptions import NotFound,ValidationError
 from rest_framework.permissions import AllowAny,IsAdminUser
 from rest_framework.response import Response
-from rest_framework.exceptions import ValidationError
+from rest_framework.throttling import AnonRateThrottle
 from .models import Mesa,Reserva
-from .serializers import MesaSerializer,ReservaSerializer,CriarReservaSerializer
-from .services import criar_reserva
+from .serializers import MesaSerializer,ReservaSerializer,CriarReservaSerializer,AREAS_RESERVA
+from .services import configuracao,disponibilidade,criar_reserva,cancelar_pelo_cliente,acao_da_equipe
+
+# Limite de requisições por IP para visitantes (taxas em settings.REST_FRAMEWORK).
+class LimiteReservas(AnonRateThrottle):scope='reservas'
+class LimiteLogin(AnonRateThrottle):scope='login'
+
+def exigir_csrf(request):
+ # O DRF só verifica CSRF para usuários logados; as escritas públicas também exigem o token emitido em /staff/session/.
+ SessionAuthentication().enforce_csrf(request)
+
+def buscar_por_token(request):
+ token=str(request.data.get('token',''))
+ if not re.fullmatch(r'[a-f0-9]{64}',token):raise NotFound('Link inválido ou reserva não encontrada.')
+ try:return Reserva.objects.prefetch_related('alocacoes__mesa').get(token=token)
+ except Reserva.DoesNotExist:raise NotFound('Link inválido ou reserva não encontrada.')
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
@@ -16,88 +33,106 @@ def saude(request):return Response({'status':'ok'})
 
 @api_view(['GET'])
 @permission_classes([AllowAny])
-def disponibilidade(request):
- try:
-  data=timezone.datetime.strptime(request.query_params['data'],'%Y-%m-%d').date()
-  pessoas=int(request.query_params['pessoas'])
-  if pessoas<1:raise ValueError()
- except (KeyError,ValueError):raise ValidationError({'detalhes':'Informe data=AAAA-MM-DD e pessoas maior que zero.'})
- if data<timezone.localdate():raise ValidationError({'data':'Data passada.'})
- mesas=Mesa.objects.filter(ativa=True,capacidade__gte=pessoas).exclude(reservas__data=data,reservas__status='confirmada').order_by('numero')
- area=request.query_params.get('area')
- if area in ('interna','externa'):mesas=mesas.filter(area=area)
- return Response(MesaSerializer(mesas,many=True).data)
+def configuracao_publica(request):return Response(configuracao())
+
+# ---------- Sessão da equipe ----------
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def sessao(request):
+ # Funciona para visitantes: emite o cookie CSRF usado pelas escritas do frontend.
+ return Response({'authenticated':bool(request.user.is_authenticated and request.user.is_staff),'csrfToken':get_token(request)})
 
 @api_view(['POST'])
 @permission_classes([AllowAny])
+@throttle_classes([LimiteLogin])
+def entrar(request):
+ exigir_csrf(request)
+ usuario=authenticate(request,username=str(request.data.get('username','')).strip(),password=str(request.data.get('password','')))
+ if usuario is None or not usuario.is_staff:raise ValidationError({'detail':'Usuário ou senha incorretos.'})
+ login(request._request,usuario)
+ return Response({'authenticated':True,'csrfToken':get_token(request)})
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+def sair(request):
+ exigir_csrf(request)
+ logout(request._request)
+ return Response(status=status.HTTP_204_NO_CONTENT)
+
+# ---------- Cliente (sem conta, acesso pelo link exclusivo) ----------
+
+@api_view(['GET'])
+@permission_classes([AllowAny])
+def consultar_disponibilidade(request):
+ try:
+  data=timezone.datetime.strptime(request.query_params['date'],'%Y-%m-%d').date()
+  pessoas=int(request.query_params['guests'])
+  if pessoas<1:raise ValueError()
+ except (KeyError,ValueError):raise ValidationError({'date':'Informe date=AAAA-MM-DD e guests maior que zero.'})
+ if data<timezone.localdate():raise ValidationError({'date':'Escolha uma data a partir de hoje.'})
+ area=request.query_params.get('area','any')
+ if area not in AREAS_RESERVA.values():raise ValidationError({'area':'Use interna, externa ou any.'})
+ return Response(disponibilidade(data,pessoas,area))
+
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([LimiteReservas])
 def nova_reserva(request):
+ exigir_csrf(request)
+ chave=request.headers.get('Idempotency-Key','').strip()[:64] or None
  serializer=CriarReservaSerializer(data=request.data)
  serializer.is_valid(raise_exception=True)
- reserva=criar_reserva(serializer.validated_data)
- return Response({**ReservaSerializer(reserva).data,'token':reserva.token,'link':f'/reservas/{reserva.token}'},status=status.HTTP_201_CREATED)
+ reserva,criada=criar_reserva(serializer.validated_data,chave)
+ return Response(ReservaSerializer(reserva,context={'publico':True}).data,status=status.HTTP_201_CREATED if criada else status.HTTP_200_OK)
 
-@api_view(['GET','POST'])
+@api_view(['POST'])
 @permission_classes([AllowAny])
-def reserva_por_token(request,token):
- from django.shortcuts import get_object_or_404
- reserva=get_object_or_404(Reserva,token=token)
- if request.method=='GET':return Response(ReservaSerializer(reserva).data)
- if request.data.get('confirmar') is not True:raise ValidationError({'confirmar':'Confirme o cancelamento enviando true.'})
- if reserva.status!='confirmada':raise ValidationError({'status':'A reserva não pode ser cancelada.'})
- chegada=timezone.make_aware(datetime.combine(reserva.data,reserva.previsao_chegada),timezone.get_current_timezone())
- if chegada<=timezone.now():raise ValidationError({'data':'Somente reservas futuras podem ser canceladas.'})
- reserva.status='cancelada';reserva.cancelado_em=timezone.now();reserva.save(update_fields=['status','cancelado_em','atualizado_em'])
- return Response({'mensagem':'Reserva cancelada.','codigo':reserva.codigo})
+@throttle_classes([LimiteReservas])
+def reserva_por_token(request):
+ exigir_csrf(request)
+ return Response(ReservaSerializer(buscar_por_token(request),context={'publico':True}).data)
 
-class MesasAdmin(generics.ListCreateAPIView):
- queryset=Mesa.objects.order_by('numero')
- serializer_class=MesaSerializer
- permission_classes=[IsAdminUser]
+@api_view(['POST'])
+@permission_classes([AllowAny])
+@throttle_classes([LimiteReservas])
+def cancelar_reserva(request):
+ exigir_csrf(request)
+ reserva=cancelar_pelo_cliente(buscar_por_token(request).token)
+ return Response(ReservaSerializer(reserva,context={'publico':True}).data)
 
-class MesaAdminDetalhe(generics.RetrieveUpdateAPIView):
- queryset=Mesa.objects.all()
- serializer_class=MesaSerializer
- permission_classes=[IsAdminUser]
+# ---------- Equipe (exige usuário is_staff logado) ----------
 
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
-def listar_reservas(request):
- qs=Reserva.objects.select_related('mesa').order_by('data','previsao_chegada')
- if request.query_params.get('data'):qs=qs.filter(data=request.query_params['data'])
- if request.query_params.get('status'):qs=qs.filter(status=request.query_params['status'])
- if request.query_params.get('cliente'):qs=qs.filter(nome__icontains=request.query_params['cliente'])
- if request.query_params.get('horario'):qs=qs.filter(previsao_chegada=request.query_params['horario'])
- return Response(ReservaSerializer(qs[:500],many=True).data)
-
-@api_view(['PATCH'])
-@permission_classes([IsAdminUser])
-def alterar_status(request,pk):
- from django.shortcuts import get_object_or_404
- reserva=get_object_or_404(Reserva,pk=pk)
- novo=request.data.get('status')
- if novo not in dict(Reserva.STATUS):raise ValidationError({'status':'Status inválido.'})
- if reserva.status=='cancelada' and novo=='confirmada':
-  if Reserva.objects.filter(mesa=reserva.mesa,data=reserva.data,status='confirmada').exclude(pk=pk).exists():raise ValidationError({'status':'Já existe reserva ativa para esta mesa e dia.'})
- reserva.status=novo
- if novo=='cancelada':reserva.cancelado_em=timezone.now()
- try:
-  from django.db import transaction,IntegrityError
-  with transaction.atomic():reserva.save()
- except IntegrityError:raise ValidationError({'status':'Conflito de disponibilidade.'})
- return Response(ReservaSerializer(reserva).data)
+def reservas_do_dia(request):
+ try:dia=timezone.datetime.strptime(request.query_params.get('date',''),'%Y-%m-%d').date()
+ except ValueError:raise ValidationError({'date':'Informe date=AAAA-MM-DD.'})
+ qs=Reserva.objects.filter(data=dia).prefetch_related('alocacoes__mesa').order_by('previsao_chegada','criado_em')
+ return Response(ReservaSerializer(qs,many=True,context={'publico':False}).data)
 
 @api_view(['POST'])
 @permission_classes([IsAdminUser])
-def confirmar_chegada(request,pk):
- from django.shortcuts import get_object_or_404
- reserva=get_object_or_404(Reserva,pk=pk)
- if reserva.status!='confirmada':raise ValidationError({'status':'Reserva não está confirmada.'})
- reserva.chegada_confirmada_em=timezone.now();reserva.save(update_fields=['chegada_confirmada_em','atualizado_em'])
- return Response(ReservaSerializer(reserva).data)
+def acao_reserva(request):
+ acao=request.data.get('action')
+ if acao not in ('arrive','complete','cancel','release'):raise ValidationError({'action':'Ação inválida.'})
+ reserva=acao_da_equipe(buscar_por_token(request).token,acao)
+ return Response(ReservaSerializer(reserva,context={'publico':False}).data)
 
 @api_view(['GET'])
 @permission_classes([IsAdminUser])
 def resumo(request):
- dia=request.query_params.get('data',str(timezone.localdate()))
+ dia=request.query_params.get('date',str(timezone.localdate()))
  qs=Reserva.objects.filter(data=dia)
- return Response({'data':dia,'mesas_ativas':Mesa.objects.filter(ativa=True).count(),'reservas_confirmadas':qs.filter(status='confirmada').count(),'reservas_canceladas':qs.filter(status='cancelada').count(),'reservas_concluidas':qs.filter(status='concluida').count(),'nao_compareceu':qs.filter(status='nao_compareceu').count()})
+ return Response({'date':dia,'activeTables':Mesa.objects.filter(ativa=True).count(),**{s:qs.filter(status=s).count() for s,_ in Reserva.STATUS}})
+
+class MesasEquipe(generics.ListCreateAPIView):
+ queryset=Mesa.objects.order_by('numero')
+ serializer_class=MesaSerializer
+ permission_classes=[IsAdminUser]
+
+class MesaEquipeDetalhe(generics.UpdateAPIView):
+ queryset=Mesa.objects.all()
+ serializer_class=MesaSerializer
+ permission_classes=[IsAdminUser]
+ http_method_names=['patch','put']

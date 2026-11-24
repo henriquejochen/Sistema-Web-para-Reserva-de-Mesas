@@ -1,6 +1,6 @@
 # Backend Django — Sistema de Reserva de Mesas
 
-API REST com Django e Django REST Framework. O frontend original **não foi modificado** e continua com dados de demonstração até integrar as chamadas HTTP.
+API REST com Django e Django REST Framework, seguindo o contrato do frontend em [docs/contrato-api-frontend.md](../docs/contrato-api-frontend.md). Os nomes dos campos da API são os do contrato (`date`, `guests`, `arrivalTime`…); no banco e no código Python continuam em português (`data`, `pessoas`, `previsao_chegada`…), traduzidos nos serializers.
 
 ## Iniciar no Windows (PowerShell)
 
@@ -10,7 +10,6 @@ py -m venv .venv
 .\.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 Copy-Item .env.example .env
-python manage.py makemigrations reservas
 python manage.py migrate
 python manage.py criar_mesas
 python manage.py createsuperuser
@@ -19,46 +18,61 @@ python manage.py runserver
 
 No Linux/macOS: `python3 -m venv .venv`, `source .venv/bin/activate` e `cp .env.example .env`.
 
-Banco padrão: SQLite (desenvolvimento). Para PostgreSQL, configure as variáveis `POSTGRES_*` no `.env`. Para implantação real, configure `DJANGO_DEBUG=False`, chave secreta forte, HTTPS, hosts permitidos e servidor de produção.
+A migração inicial já está versionada em `reservas/migrations/`; **não** é preciso rodar `makemigrations`. Se você tinha um `db.sqlite3` ou migrações locais da versão anterior, apague-os antes do `migrate`.
+
+Banco padrão: SQLite (desenvolvimento). Para PostgreSQL, configure as variáveis `POSTGRES_*` no `.env`. O modelo também está documentado em [database/schema.sql](../database/schema.sql) e as mesas iniciais em [database/seed.sql](../database/seed.sql).
+
+## Ligar o frontend ao backend
+
+Com o Django rodando em `localhost:8000`, crie `frontend/.env.local`:
+
+```text
+VITE_API_BASE_URL=http://localhost:8000/api
+```
+
+e rode `npm run dev` no frontend. Acesse a equipe por `/equipe` com um usuário **is_staff** (o superusuário serve; para funcionários, crie usuários no `/admin/` marcando "Membro da equipe").
+
+Em produção o Django entrega o frontend compilado e a API no mesmo endereço. Passo a passo para publicar grátis no Render com banco no Neon: [docs/deploy-render.md](../docs/deploy-render.md).
 
 ## Endpoints
 
+Todas as rotas começam com `/api`. Escritas exigem o cabeçalho `X-CSRFToken` (emitido em `GET /staff/session/`).
+
 | Método | Rota | Acesso |
 |---|---|---|
-| GET | `/api/saude/` | público |
-| GET | `/api/mesas/disponiveis/?data=2026-12-10&pessoas=3&area=interna` | público |
-| POST | `/api/reservas/` | público |
-| GET | `/api/reservas/acesso/<token>/` | link secreto |
-| POST | `/api/reservas/acesso/<token>/` | link secreto, JSON `{"confirmar":true}` |
-| GET, POST | `/api/admin/mesas/` | administrador |
-| GET, PATCH, PUT | `/api/admin/mesas/<id>/` | administrador |
-| GET | `/api/admin/reservas/?data=2026-12-10&status=confirmada` | administrador |
-| PATCH | `/api/admin/reservas/<id>/status/` | administrador |
-| POST | `/api/admin/reservas/<id>/chegada/` | administrador |
-| GET | `/api/admin/resumo/?data=2026-12-10` | administrador |
+| GET | `/saude/` | público |
+| GET | `/configuration/` | público |
+| GET | `/availability/?date=2026-12-10&guests=3&area=any` | público |
+| POST | `/reservations/` (cabeçalho `Idempotency-Key`) | público |
+| POST | `/reservations/access/` `{"token": "..."}` | link secreto |
+| POST | `/reservations/cancel/` `{"token": "..."}` | link secreto |
+| GET | `/staff/session/` | público (diz se há sessão da equipe) |
+| POST | `/staff/login/` `{"username","password"}` | público |
+| POST | `/staff/logout/` | sessão |
+| GET | `/staff/reservations/?date=2026-12-10` | equipe |
+| POST | `/staff/reservations/action/` `{"token","action"}` | equipe |
+| GET | `/staff/summary/?date=2026-12-10` | equipe |
+| GET, POST | `/staff/tables/` | equipe |
+| PATCH | `/staff/tables/<id>/` | equipe |
 
-### Criar reserva
+Ações da equipe: `arrive` (chegou), `complete` (concluir), `cancel` e `release` (não compareceu, só após a tolerância). Cada reserva traz `allowedActions` com o que é permitido no momento; o servidor confere de novo em toda operação.
 
-```json
-{"mesa":1,"nome":"Maria","telefone":"48999998888","pessoas":3,"data":"2026-12-10","previsao_chegada":"19:00"}
-```
-
-A resposta inclui `codigo` e `token` secreto. Guarde o token no cliente para consultar/cancelar, **não publique o token em logs ou URLs compartilhadas**. A rota `/reservas/<token>` retornada é uma sugestão para o frontend implementar, não uma página já existente.
-
-### Autenticação administrativa
-
-Use o painel `/admin/` com o superusuário criado. As rotas `/api/admin/` exigem usuário `is_staff`. Para integração por frontend em outra origem, é necessário implementar fluxo de login e proteção CSRF (ou outra autenticação adequada) antes de colocar em produção. A API não oferece cadastro/login de clientes, conforme RF03.
+Erros: `{"detail": "...", "fields": {"campo": ["..."]}}` — 400 dados inválidos, 401 sem sessão, 403 sem permissão/CSRF, 404 link inexistente, 409 conflito de disponibilidade ou ação não permitida, 429 excesso de requisições.
 
 ## Regras implementadas
 
-- Mesas ativas e com capacidade suficiente; disponibilidade por **dia inteiro**, não por horário (RN01, RN03, RN04, RN15).
-- Uma reserva confirmada por mesa/dia, protegida por restrição única condicional no banco (recomendado PostgreSQL em produção).
-- Dados obrigatórios e telefone com DDD, data/previsão futuras.
-- Código único e token aleatório de acesso; cliente só consulta/cancela com token.
-- Cancelamento confirmado apenas para reserva futura; cancelada libera mesa.
-- Gestão de mesas, status, chegada e resumo, restritos a administradores.
+- Disponibilidade por **dia inteiro** (RN15). O cliente escolhe só a área; o backend atribui a menor mesa ativa que comporte o grupo. Se nenhuma comportar, junta mesas livres da mesma área (ex.: 7 pessoas → duas mesas de 4).
+- Uma mesa só tem uma reserva ativa por dia, garantido por restrição única condicional no banco (`ReservaMesa`), inclusive com pedidos simultâneos (RN01, RNF12).
+- Reserva sem disponibilidade → 409 e sugestões de outra área/datas (RN14).
+- Chegada dentro do horário configurado, até `RESERVA_MAX_PESSOAS`, telefone com DDD, data e chegada futuras.
+- `Idempotency-Key`: reenviar o mesmo formulário não cria reserva duplicada; a mesma chave com outros dados é recusada.
+- Token de 64 caracteres hexadecimais enviado no corpo (não na URL); código curto `R-XXXXXXXX` só identifica.
+- Cliente cancela só reserva confirmada com chegada futura; cancelada/concluída/ausente libera a mesa.
+- Atraso calculado no servidor; alerta após `RESERVA_ALERTA_MINUTOS`, liberação por ausência após `RESERVA_TOLERANCIA_MINUTOS` (RN23), nunca automática. Fica gravada como `nao_compareceu` e aparece para o frontend como `Cancelada` com motivo.
+- Mesa com reservas ativas a partir de hoje não pode ser inativada; campos desconhecidos são rejeitados.
+- Login da equipe por sessão + CSRF; só usuários `is_staff`. Limite de requisições por IP, `Cache-Control: no-store` na API e cookies seguros quando `DJANGO_DEBUG=False`.
 
-**Observações:** a regra de atraso/tolerância e horários de funcionamento ainda dependem de definições de negócio; não foram inventadas. O protótipo React usa `localStorage` e ainda precisa ser conectado à API. Para produção, adicionar limites de requisição (rate limiting), logs seguros, HTTPS, testes de concorrência em PostgreSQL e autenticação de funcionários via sessão/CSRF ou token apropriado.
+**Pendente de decisão da equipe:** aprovar a junção de mesas para grupos grandes, o telefone de contato real e o texto de privacidade. A situação da mesa (Disponível/Reservada/Ocupada) é editada pela equipe; não é calculada a partir das reservas.
 
 ## Testes
 

@@ -1,0 +1,13 @@
+.git
+**/node_modules
+**/.venv
+**/__pycache__
+**/*.pyc
+**/.env
+**/.env.*
+!**/.env.example
+**/db.sqlite3
+frontend/dist
+backend/staticfiles
+frontend/test-results
+frontend/playwright-report
