@@ -128,7 +128,9 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     headers.set("Accept", "application/json");
     if (init.body) headers.set("Content-Type", "application/json");
     if (init.method && init.method !== "GET")
-      headers.set("X-CSRFToken", csrfToken || decodeURIComponent(cookie ?? ""));
+      // O cookie reflete a troca de token feita pelo Django em cada login (ex.: no /admin);
+      // o valor guardado em memória fica como alternativa quando o cookie não é legível.
+      headers.set("X-CSRFToken", decodeURIComponent(cookie ?? "") || csrfToken);
     const response = await fetch(base + path, {
       ...init,
       headers,

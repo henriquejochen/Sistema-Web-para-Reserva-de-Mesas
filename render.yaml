@@ -1,0 +1,27 @@
+# Blueprint do Render: New > Blueprint > escolher este repositório.
+# As variáveis com "sync: false" são preenchidas no painel durante a criação.
+services:
+  - type: web
+    name: pizzaria-reservas
+    runtime: docker
+    plan: free
+    # Mesma região do banco no Neon (AWS us-east-1) para as consultas serem rápidas.
+    region: virginia
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    healthCheckPath: /api/saude/
+    envVars:
+      - key: DJANGO_SECRET_KEY
+        generateValue: true
+      - key: DJANGO_DEBUG
+        value: "False"
+      - key: DATABASE_URL
+        sync: false
+      - key: DJANGO_SUPERUSER_USERNAME
+        sync: false
+      - key: DJANGO_SUPERUSER_PASSWORD
+        sync: false
+      - key: RESERVA_TELEFONE_CONTATO
+        sync: false
+      - key: WEB_CONCURRENCY
+        value: "2"
